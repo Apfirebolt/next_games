@@ -3,6 +3,7 @@ import gameService from "./gameService";
 
 const initialState = {
   gameList: [],
+  game: {},
   isError: false,
   isSuccess: false,
   isLoading: false,
@@ -15,6 +16,24 @@ export const getGames = createAsyncThunk(
   async (params, thunkAPI) => {
     try {
       return await gameService.getGameList(params.page, params.search);
+    } catch (error) {
+      const message =
+        (error.response &&
+          error.response.data &&
+          error.response.data.message) ||
+        error.message ||
+        error.toString();
+
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+export const getGameById = createAsyncThunk(
+  "game/detail",
+  async (id, thunkAPI) => {
+    try {
+      return await gameService.getGameById(id);
     } catch (error) {
       const message =
         (error.response &&
@@ -49,6 +68,18 @@ export const gameSlice = createSlice({
         state.gameList = action.payload;
       })
       .addCase(getGames.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      .addCase(getGameById.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getGameById.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.game = action.payload;
+      })
+      .addCase(getGameById.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

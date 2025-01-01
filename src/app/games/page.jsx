@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Fragment } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import Link from 'next/link';
 import { getGames } from "../../features/gameSlice";
 import Footer from "../../components/Footer";
 import Header from "../../components/Header";
@@ -87,6 +88,9 @@ export default function Games() {
                 <p className="text-base">Critic Score: {game.critic_score}</p>
                 <p className="text-base">Total Sales: {game.total_sales}M</p>
                 <p className="text-base">Release Date: {game.release_date}</p>
+                <Link href={`/games/${game.id}`} className="hover:underline bg-tan text-neutral-100 text-center rounded p-2 mt-2 block">
+                  View Details
+                </Link>
               </div>
             </div>
           ))}
