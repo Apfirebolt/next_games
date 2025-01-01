@@ -12,7 +12,6 @@ const getGameList = async (page = 1, search = '') => {
       params.append('search', search);
     }
     API_URL = `${API_URL}?${params.toString()}`;
-    console.log('calling here .. ', API_URL)
     const response = await axios.get(API_URL)
     return response.data
   } catch (err) {
