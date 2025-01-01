@@ -1,10 +1,11 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import StoreProvider from "./StoreProvider";
+import Footer from "../components/Footer";
 
 export const metadata = {
-  title: "Spotify Clone - Next.js",
-  description: "This is a spotify clone built with Next.js",
+  title: "Games - Next.js",
+  description: "This is a games database app built with Next.js",
 };
 
 const MainLayout = ({ children }) => {

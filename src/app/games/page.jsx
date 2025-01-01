@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Fragment } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { getGames } from "../../features/gameSlice";
+import Footer from "../../components/Footer";
+import Header from "../../components/Header";
 
 export default function Games() {
 
@@ -15,22 +17,37 @@ export default function Games() {
     dispatch(getGames());
   }, [dispatch]);
 
-  console.log('Gamelist ', gameList)
+  const showGameImage = (game) => {
+    return `https://www.vgchartz.com${game.img}`;
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="flex flex-col items-center">
-        <h1 className="text-4xl font-bold text-center text-red-700">
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
+    <Fragment>
+      <Header />
+      <main className="container mx-auto px-4">
+        <h1 className="text-3xl font-bold text-center my-5">
+          Games
         </h1>
-        <p>Welcome to the Game page</p>
         {isLoading && <p>Loading...</p>}
-        {gameList && gameList.results && gameList.results.map((game) => (
-          <div key={game.id} className="flex flex-col items-center">
-            <h2>{game.title}</h2>
-          </div>
-        ))}
-      </div>
-    </main>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {gameList && gameList.results && gameList.results.map((game) => (
+            <div key={game.id} className="max-w-sm rounded overflow-hidden shadow-lg m-4">
+              <img className="w-full" src={showGameImage(game)} alt={game.title} />
+              <div className="px-6 py-4">
+                <div className="font-bold text-xl mb-2">{game.title}</div>
+                <p className="text-gray-700 text-base">Console: {game.console}</p>
+                <p className="text-gray-700 text-base">Genre: {game.genre}</p>
+                <p className="text-gray-700 text-base">Publisher: {game.publisher}</p>
+                <p className="text-gray-700 text-base">Developer: {game.developer}</p>
+                <p className="text-gray-700 text-base">Critic Score: {game.critic_score}</p>
+                <p className="text-gray-700 text-base">Total Sales: {game.total_sales}M</p>
+                <p className="text-gray-700 text-base">Release Date: {game.release_date}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+      <Footer />
+    </Fragment>
   );
 }

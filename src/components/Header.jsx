@@ -13,6 +13,9 @@ const Header = () => {
                         <li>
                             <Link href="/about" className="text-white hover:text-gray-300">About</Link>
                         </li>
+                        <li>
+                            <Link href="/games" className="text-white hover:text-gray-300">Games</Link>
+                        </li>
                     </ul>
                 </nav>
             </div>
