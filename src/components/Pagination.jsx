@@ -65,7 +65,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
     };
 
     return (
-        <div className="flex justify-center items-center space-x-2 mb-4">
+        <div className="flex justify-center text-neutral-100 items-center space-x-2 mb-4">
             <button
                 onClick={handlePrevious}
                 className="px-4 py-2 bg-carafe text-onSecondary rounded hover:bg-hoverSecondary"

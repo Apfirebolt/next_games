@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { getGames } from "../../features/gameSlice";
 import Footer from "../../components/Footer";
 import Header from "../../components/Header";
+import Loader from "../../components/Loader";
 import Pagination from "../../components/Pagination";
 
 export default function Games() {
@@ -12,11 +13,12 @@ export default function Games() {
   const gameList = useSelector((state) => state.game.gameList);
   const isLoading = useSelector((state) => state.game.isLoading);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchText, setSearchText] = useState("");
 
   const dispatch = useDispatch();
 
   useEffect(() => {
-    dispatch(getGames());
+    dispatch(getGames(1, ''));
   }, [dispatch]);
 
   const showGameImage = (game) => {
@@ -28,11 +30,25 @@ export default function Games() {
     dispatch(getGames(page));
   }
 
+  // debounce search here
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      console.log('searching...', searchText);
+      const params = {
+        page: 1,
+        search: searchText
+      };
+      dispatch(getGames(params));
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchText]);
+
   return (
     <Fragment>
       <Header />
       <main className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center my-5">
+        <h1 className="text-3xl font-bold text-center my-5 bg-white p-4 rounded-lg shadow-lg">
           Games
         </h1>
         {gameList && gameList.count && (
@@ -42,7 +58,16 @@ export default function Games() {
             onPageChange={handlePageChange} 
           />
         )}
-        {isLoading && <p>Loading...</p>}
+        <div className="flex justify-center my-4">
+          <input
+            type="text"
+            placeholder="Search games..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full max-w-xl"
+          />
+        </div>
+        {isLoading && <Loader />}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {gameList && gameList.results && gameList.results.map((game) => (
             <div key={game.id} className="max-w-sm rounded overflow-hidden shadow-lg text-neutral-100 bg-carafe m-4">
