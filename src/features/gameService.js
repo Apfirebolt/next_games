@@ -1,9 +1,12 @@
 import axios from 'axios'
-const API_URL = 'https://softgenie.org/api/games'
 
 // Get game List
-const getGameList = async () => {
+const getGameList = async (page = 1) => {
   try {
+    let API_URL = 'https://softgenie.org/api/games'
+    if (page > 1) {
+      API_URL = `${API_URL}?page=${page}`
+    }
     const response = await axios.get(API_URL)
     return response.data
   } catch (err) {

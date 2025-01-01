@@ -2,9 +2,9 @@ import Link from 'next/link';
 
 const Header = () => {
     return (
-        <header className="bg-gray-800">
+        <header className="bg-carafe">
             <div className="container mx-auto flex justify-between items-center p-4">
-                <h1 className="text-white text-2xl">My App</h1>
+                <h1 className="text-sand text-2xl">Games</h1>
                 <nav>
                     <ul className="flex space-x-4">
                         <li>

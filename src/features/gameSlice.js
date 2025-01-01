@@ -12,9 +12,9 @@ const initialState = {
 // Get Multiple games
 export const getGames = createAsyncThunk(
   "game/list",
-  async (_, thunkAPI) => {
+  async (page, thunkAPI) => {
     try {
-      return await gameService.getGameList();
+      return await gameService.getGameList(page);
     } catch (error) {
       const message =
         (error.response &&

@@ -1,5 +1,4 @@
 import React from 'react';
-import PropTypes from 'prop-types';
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
     const handlePrevious = () => {
@@ -14,33 +13,76 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
         }
     };
 
+    const handlePageClick = (page) => {
+        if (page !== currentPage) {
+            onPageChange(page);
+        }
+    };
+
+    const renderPageNumbers = () => {
+        const pages = [];
+        const startPages = [1, 2, 3, 4];
+        const endPages = [totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+
+        if (totalPages <= 8) {
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            startPages.forEach(page => {
+                if (page <= totalPages) {
+                    pages.push(page);
+                }
+            });
+
+            if (currentPage > 4 && currentPage < totalPages - 3) {
+                pages.push('...');
+                pages.push(currentPage - 1);
+                pages.push(currentPage);
+                pages.push(currentPage + 1);
+                pages.push('...');
+            } else {
+                pages.push('...');
+            }
+
+            endPages.forEach(page => {
+                if (page > 4) {
+                    pages.push(page);
+                }
+            });
+        }
+
+        return pages.map((page, index) => (
+            <button
+                key={index}
+                onClick={() => typeof page === 'number' && handlePageClick(page)}
+                className={`px-4 py-2 ${page === currentPage ? 'bg-tan text-onPrimary' : 'bg-carafe text-onSecondary'} rounded hover:bg-hoverSecondary`}
+                disabled={typeof page !== 'number'}
+            >
+                {page}
+            </button>
+        ));
+    };
+
     return (
-        <div className="flex justify-center items-center space-x-2 mt-4">
+        <div className="flex justify-center items-center space-x-2 mb-4">
             <button
                 onClick={handlePrevious}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="px-4 py-2 bg-carafe text-onSecondary rounded hover:bg-hoverSecondary"
                 disabled={currentPage === 1}
             >
                 Previous
             </button>
-            <span className="px-4 py-2">
-                Page {currentPage} of {totalPages}
-            </span>
+            {renderPageNumbers()}
             <button
                 onClick={handleNext}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="px-4 py-2 bg-carafe text-onSecondary rounded hover:bg-hoverSecondary"
                 disabled={currentPage === totalPages}
             >
                 Next
             </button>
         </div>
     );
-};
-
-Pagination.propTypes = {
-    currentPage: PropTypes.number.isRequired,
-    totalPages: PropTypes.number.isRequired,
-    onPageChange: PropTypes.func.isRequired,
 };
 
 export default Pagination;
