@@ -11,7 +11,7 @@ export const metadata = {
 const MainLayout = ({ children }) => {
   return (
     <html lang="en">
-      <body className="font-sans text-neutral-900 bg-sand">
+      <body className="bg-sand">
         <StoreProvider>{children}</StoreProvider>
       </body>
     </html>

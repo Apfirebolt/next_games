@@ -31,6 +31,9 @@ export default function About() {
           >
             View
           </button>
+          <p className="para">
+            Some dummy text to fill up the space. Some dummy text to fill up the
+          </p>
           <Transition appear show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-10" onClose={closeModal}>
               <Transition.Child
