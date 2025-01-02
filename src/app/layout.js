@@ -1,7 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
+import './main.css';
 import StoreProvider from "./StoreProvider";
-import Footer from "../components/Footer";
 
 export const metadata = {
   title: "Games - Next.js",

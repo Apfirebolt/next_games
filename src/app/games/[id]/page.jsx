@@ -40,13 +40,13 @@ export default function GameDetail() {
                             <img className="w-full max-w-md" src={showGameImage(game)} alt={game.title} />
                         </div>
                         <div className="px-6 py-4">
-                            <p className="text-base">Console: {game.console}</p>
-                            <p className="text-base">Genre: {game.genre}</p>
-                            <p className="text-base">Publisher: {game.publisher}</p>
-                            <p className="text-base">Developer: {game.developer}</p>
-                            <p className="text-base">Critic Score: {game.critic_score}</p>
-                            <p className="text-base">Total Sales: {game.total_sales}M</p>
-                            <p className="text-base">Release Date: {game.release_date}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Console: {game.console}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Genre: {game.genre}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Publisher: {game.publisher}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Developer: {game.developer}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Critic Score: {game.critic_score}</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Total Sales: {game.total_sales}M</p>
+                            <p className="text-base text-center bg-tan p-2 my-1">Release Date: {game.release_date}</p>
                         </div>
                     </div>
                 )}
