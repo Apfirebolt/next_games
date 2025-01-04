@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
@@ -65,7 +67,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
     };
 
     return (
-        <div className="flex justify-center text-neutral-100 items-center space-x-2 mb-4">
+        <div className="flex flex-col sm:flex-row justify-center text-neutral-100 items-center space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
             <button
                 onClick={handlePrevious}
                 className="px-4 py-2 bg-carafe text-onSecondary rounded hover:bg-hoverSecondary"
@@ -73,7 +75,9 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
             >
                 Previous
             </button>
-            {renderPageNumbers()}
+            <div className="flex space-x-2">
+                {renderPageNumbers()}
+            </div>
             <button
                 onClick={handleNext}
                 className="px-4 py-2 bg-carafe text-onSecondary rounded hover:bg-hoverSecondary"

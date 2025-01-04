@@ -75,9 +75,13 @@ export default function Games() {
           />
         )}
         {isLoading && <Loader />}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-4">
           {gameList && gameList.results && gameList.results.map((game) => (
-            <div key={game.id} className="max-w-sm rounded overflow-hidden shadow-lg text-neutral-100 bg-carafe m-4">
+            <div 
+              key={game.id} 
+              className="break-inside-avoid max-w-sm rounded overflow-hidden shadow-lg text-neutral-100 bg-carafe mb-4"
+              style={{ height: `${Math.floor(Math.random() * 200) + 300}px` }}
+            >
               <img className="w-full" src={showGameImage(game)} alt={game.title} />
               <div className="px-6 py-4">
                 <div className="font-bold text-xl mb-2">{game.title}</div>
