@@ -3,6 +3,7 @@
 import { useEffect, useState, Fragment } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import Link from 'next/link';
+import gsap from 'gsap';
 import { getGames } from "../../features/gameSlice";
 import Footer from "../../components/Footer";
 import Header from "../../components/Header";
@@ -34,6 +35,11 @@ export default function Games() {
     };
     dispatch(getGames(params));
   }
+
+  // apply gsap animation
+  useEffect(() => {
+    gsap.from('.break-inside-avoid', { opacity: 0, x: -100, duration: 1, stagger: 0.2, ease: 'power3.inOut' });
+  }, []);
 
   // debounce search here
   useEffect(() => {
@@ -79,7 +85,7 @@ export default function Games() {
           {gameList && gameList.results && gameList.results.map((game) => (
             <div 
               key={game.id} 
-              className="break-inside-avoid max-w-sm rounded overflow-hidden shadow-lg text-neutral-100 bg-carafe mb-4"
+              className="break-inside-avoid max-w-sm rounded shadow-lg text-neutral-100 bg-carafe mb-4"
               style={{ height: `${Math.floor(Math.random() * 200) + 300}px` }}
             >
               <img className="w-full" src={showGameImage(game)} alt={game.title} />
