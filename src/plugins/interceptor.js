@@ -1,7 +1,11 @@
 import axios from 'axios';
 import Cookies from "js-cookie";
 
-let baseURL = 'http://localhost:3000/api/';
+// for dev
+// let baseURL = 'http://localhost:3000/api/';
+
+// for prod
+let baseURL = 'https://www.codelean.in/api/';
 
 const httpClient = axios.create({ baseURL });
 
