@@ -1,11 +1,29 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import authService from "./authService";
 
-// Get user from localstorage
-const user = JSON.parse(localStorage.getItem("user"));
+// SSR-Safe storage retrieval for Next.js
+const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const item = localStorage.getItem("user");
+    return item ? JSON.parse(item) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Helper: Extract human-readable error for rejectWithValue
+const extractErrorMessage = (error) => {
+  return (
+    error.response?.data?.detail ||
+    error.response?.data?.message ||
+    error.message ||
+    error.toString()
+  );
+};
 
 const initialState = {
-  user: user ? user : null,
+  user: getStoredUser(),
   profile: null,
   isError: false,
   isSuccess: false,
@@ -16,57 +34,40 @@ const initialState = {
 // Register new user
 export const register = createAsyncThunk(
   "auth/register",
-  async (user, thunkAPI) => {
+  async (userData, thunkAPI) => {
     try {
-      return await authService.register(user);
+      return await authService.register(userData);
     } catch (error) {
-      const message =
-        (error.response &&
-          error.response.data &&
-          error.response.data.message) ||
-        error.message ||
-        error.toString();
-
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(extractErrorMessage(error));
     }
   }
 );
 
 // Login user
-export const login = createAsyncThunk("auth/login", async (user, thunkAPI) => {
-  try {
-    return await authService.login(user);
-  } catch (error) {
-    const message =
-      (error.response && error.response.data && error.response.data.message) ||
-      error.message ||
-      error.toString();
-
-    return thunkAPI.rejectWithValue(message);
+export const login = createAsyncThunk(
+  "auth/login",
+  async (userData, thunkAPI) => {
+    try {
+      return await authService.login(userData);
+    } catch (error) {
+      return thunkAPI.rejectWithValue(extractErrorMessage(error));
+    }
   }
-});
+);
 
 // Logout user
 export const logout = createAsyncThunk("auth/logout", async () => {
   authService.logout();
 });
 
-// Get User Profile
+// Update User Profile (No manual token extraction needed)
 export const updateUserProfile = createAsyncThunk(
   "auth/profile",
   async (userData, thunkAPI) => {
     try {
-      const token = thunkAPI.getState().auth.user.access;
-      return await authService.updateProfile(userData, token);
+      return await authService.updateProfile(userData);
     } catch (error) {
-      const message =
-        (error.response &&
-          error.response.data &&
-          error.response.data.message) ||
-        error.message ||
-        error.toString();
-
-      return thunkAPI.rejectWithValue(message);
+      return thunkAPI.rejectWithValue(extractErrorMessage(error));
     }
   }
 );
@@ -84,6 +85,7 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Register
       .addCase(register.pending, (state) => {
         state.isLoading = true;
       })
@@ -98,6 +100,8 @@ export const authSlice = createSlice({
         state.message = action.payload;
         state.user = null;
       })
+
+      // Login
       .addCase(login.pending, (state) => {
         state.isLoading = true;
       })
@@ -112,27 +116,32 @@ export const authSlice = createSlice({
         state.message = action.payload;
         state.user = null;
       })
+
+      // Update Profile
       .addCase(updateUserProfile.pending, (state) => {
         state.isLoading = true;
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
-        // update user profile except token
-        state.user.email = action.payload.email;
-        state.user.username = action.payload.username;
-        state.user.firstName = action.payload.firstName;
-        state.user.lastName = action.payload.lastName;
+        state.profile = action.payload;
+        if (state.user) {
+          state.user = { ...state.user, ...action.payload };
+        }
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
-        state.user = null;
       })
+
+      // Logout
       .addCase(logout.fulfilled, (state) => {
         state.user = null;
         state.profile = null;
+        state.isSuccess = false;
+        state.isError = false;
+        state.message = "";
       });
   },
 });
