@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
@@ -32,6 +33,8 @@ const Header = () => {
     dispatch(logout());
     dispatch(reset());
     setIsUserMenuOpen(false);
+  
+    toast.info("Logged out successfully");
     setIsOpen(false);
     router.push('/login');
   };

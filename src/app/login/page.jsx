@@ -35,10 +35,18 @@ export default function LoginPage() {
     }));
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    dispatch(login({ email, password }));
+
+    try {
+        await dispatch(login({ email, password })).unwrap();
+
+        router.push("/");
+    } catch (error) {
+      // Error handling is already managed by authService/toasts
+    }
   };
+
 
   return (
     <div className="flex min-h-screen bg-carafe text-sand">

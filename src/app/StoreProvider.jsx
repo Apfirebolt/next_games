@@ -1,9 +1,24 @@
 "use client";
+
+import { useRef } from "react";
 import { Provider } from "react-redux";
-import { store } from "../store";
+import { makeStore } from "../store";
 
-const StoreProvider = ({ children }) => {
-  return <Provider store={store}>{children}</Provider>;
-};
+export default function StoreProvider({ children, initialUser = null }) {
+  const storeRef = useRef(null);
 
-export default StoreProvider;
+  if (!storeRef.current) {
+    storeRef.current = makeStore({
+      auth: {
+        user: initialUser,
+        profile: null,
+        isError: false,
+        isSuccess: false,
+        isLoading: false,
+        message: "",
+      },
+    });
+  }
+
+  return <Provider store={storeRef.current}>{children}</Provider>;
+}

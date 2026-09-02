@@ -16,3 +16,92 @@
   --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
   --background-image-gradient-conic: conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops));
 }
+
+
+:root {
+  /* Core container styling */
+  --toastify-color-light: #231713;
+  --toastify-color-dark: #231713;
+  --toastify-text-color-light: #E8D8C8;
+  --toastify-text-color-dark: #E8D8C8;
+
+  /* Status accent colors harmonized with earthy tones */
+  --toastify-color-info: #7B8FA1;
+  --toastify-color-success: #6E8B68;
+  --toastify-color-warning: #C8965E;
+  --toastify-color-error: #A24836;
+
+  /* Progress bars */
+  --toastify-color-progress-light: #B8977E;
+  --toastify-color-progress-dark: #B8977E;
+  --toastify-color-progress-success: #6E8B68;
+  --toastify-color-progress-error: #A24836;
+}
+
+/* Toast Card Base */
+.Toastify__toast {
+  background-color: #231713 !important;
+  color: #E8D8C8 !important;
+  border: 1px solid rgba(184, 151, 126, 0.25) !important;
+  border-radius: 0.875rem !important; /* rounded-xl */
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.65), 0 4px 10px -2px rgba(0, 0, 0, 0.4) !important;
+  font-family: inherit !important;
+  padding: 14px 16px !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Body / Text */
+.Toastify__toast-body {
+  color: #E8D8C8 !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+}
+
+/* Close Button (matches tan/sand accents) */
+.Toastify__close-button {
+  color: #B8977E !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.15s ease, color 0.15s ease !important;
+  align-self: center !important;
+}
+
+.Toastify__close-button:hover {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* Left Status Icons */
+.Toastify__toast-icon {
+  width: 20px !important;
+  margin-inline-end: 12px !important;
+}
+
+.Toastify__toast-icon svg {
+  fill: currentColor !important;
+}
+
+/* Status variants subtle borders & accents */
+.Toastify__toast--success {
+  border-left: 4px solid #6E8B68 !important;
+}
+
+.Toastify__toast--error {
+  border-left: 4px solid #A24836 !important;
+}
+
+.Toastify__toast--warning {
+  border-left: 4px solid #C8965E !important;
+}
+
+.Toastify__toast--info {
+  border-left: 4px solid #B8977E !important;
+}
+
+/* Progress bar thickness & radius */
+.Toastify__progress-bar {
+  height: 3px !important;
+  border-bottom-left-radius: 0.875rem !important;
+}
