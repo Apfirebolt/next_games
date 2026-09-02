@@ -25,7 +25,7 @@ const extractErrorMessage = (error) => {
 };
 
 const initialState = {
-  user: getStoredUser(),
+  user: typeof window !== "undefined" ? getStoredUser() : null,
   profile: null,
   isError: false,
   isSuccess: false,

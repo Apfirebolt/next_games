@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
@@ -9,12 +9,17 @@ import { logout, reset } from '../features/auth/authSlice';
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const router = useRouter();
   const dispatch = useDispatch();
 
-  // Safe fallback to avoid destructuring errors if auth slice is uninitialized
   const { user } = useSelector((state) => state.auth || {});
+
+  // Guarantees client-side DOM matches server-side DOM on initial render pass
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -31,6 +36,8 @@ const Header = () => {
     router.push('/login');
   };
 
+  // Only consider authenticated once mounted in the browser
+  const isAuthenticated = mounted && Boolean(user);
   const displayName = user?.firstName || user?.username || user?.email || 'Player';
 
   return (
@@ -64,7 +71,7 @@ const Header = () => {
 
           {/* Desktop Auth State Controls */}
           <div className="flex items-center gap-3">
-            {user ? (
+            {isAuthenticated ? (
               <div className="relative">
                 <button
                   type="button"
@@ -86,7 +93,6 @@ const Header = () => {
                   </svg>
                 </button>
 
-                {/* Dropdown Menu for Authenticated User */}
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl border border-brown/40 bg-carafe p-1.5 shadow-2xl backdrop-blur-xl">
                     <div className="border-b border-brown/30 px-3 py-2 text-[11px] text-tan">
@@ -172,7 +178,7 @@ const Header = () => {
             ))}
 
             <div className="my-2 border-t border-brown/30 pt-2">
-              {user ? (
+              {isAuthenticated ? (
                 <>
                   <div className="px-3 py-2 text-xs text-tan">
                     Signed in as <span className="font-bold text-white">{displayName}</span>
