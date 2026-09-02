@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import Link from "next/link";
 import gsap from "gsap";
-import { getGames } from "../../features/gameSlice";
+import { getGames } from "../../features/game/gameSlice";
 import Footer from "../../components/Footer";
 import Header from "../../components/Header";
 import Loader from "../../components/Loader";

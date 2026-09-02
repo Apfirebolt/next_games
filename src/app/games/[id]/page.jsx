@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getGameById } from "../../../features/gameSlice";
+import { getGameById } from "../../../features/game/gameSlice";
 import Footer from "../../../components/Footer";
 import Header from "../../../components/Header";
 import Loader from "../../../components/Loader";
