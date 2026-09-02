@@ -1,13 +1,15 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import authService from "./authService";
+import Cookies from "js-cookie";
 
-// SSR-Safe storage retrieval for Next.js
+// SSR-Safe cookie retrieval for Next.js
 const getStoredUser = () => {
   if (typeof window === "undefined") return null;
   try {
-    const item = localStorage.getItem("user");
+    const item = Cookies.get("user");
     return item ? JSON.parse(item) : null;
-  } catch {
+  } catch (error) {
+    console.error("Failed to parse user cookie:", error);
     return null;
   }
 };

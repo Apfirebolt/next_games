@@ -1,7 +1,7 @@
 // src/lib/auth.js
 import jwt from "jsonwebtoken";
-import User from "@/models/user";
-import dbConnect from "@/lib/dbConnect";
+import User from "../models/user";
+import dbConnect from "../lib/dbConnect";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 

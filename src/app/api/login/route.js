@@ -1,9 +1,43 @@
 // src/app/api/login/route.js
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
-import User from "@/models/user";
-import { generateToken } from "@/lib/auth";
+import dbConnect from "../../../lib/dbConnect";
+import User from "../../../models/user";
+import { generateToken } from "../../../lib/auth";
 
+/**
+ * @swagger
+ * /api/login:
+ *   post:
+ *     summary: Authenticate user & receive access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Logged in successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthSuccess'
+ *       400:
+ *         description: Missing fields or invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 export async function POST(request) {
   try {
     await dbConnect();
