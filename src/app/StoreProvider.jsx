@@ -12,8 +12,9 @@ function AuthSync() {
   const currentUser = useSelector((state) => state.auth?.user);
 
   useEffect(() => {
-    // 1. User logged in via NextAuth / Google
     if (status === "authenticated" && session?.user && !currentUser) {
+      const token = session.user.token;
+
       dispatch(
         setCredentials({
           id: session.user.id,
@@ -23,14 +24,10 @@ function AuthSync() {
           email: session.user.email,
           image: session.user.image,
           isAdmin: session.user.isAdmin ?? false,
-          token: session.user.token ?? null,
-        })
+          token: token,
+          access: token,
+        }),
       );
-    }
-
-    // 2. User logged out via NextAuth
-    if (status === "unauthenticated" && currentUser?.provider === "google") {
-      dispatch(logout());
     }
   }, [session, status, currentUser, dispatch]);
 

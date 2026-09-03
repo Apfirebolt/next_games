@@ -1,9 +1,11 @@
 // src/lib/auth.js
 import jwt from "jsonwebtoken";
 import User from "../models/user";
-import dbConnect from "../lib/dbConnect";
+import dbConnect from "./dbConnect";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./authOptions";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
 
 if (!JWT_SECRET) {
   throw new Error("Please define the JWT_SECRET environment variable in .env.local");
@@ -20,18 +22,35 @@ export const generateToken = (userId) => {
 export const getAuthenticatedUser = async (request) => {
   await dbConnect();
 
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
+  // 1. Try Bearer Token verification
+  const authHeader = request?.headers?.get?.("authorization") || request?.headers?.authorization;
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1]?.trim();
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await User.findById(decoded.id).select("-password").lean();
+        if (user) return user;
+      } catch (error) {
+        // Token invalid or expired; proceed to NextAuth fallback
+      }
+    }
   }
 
-  const token = authHeader.split(" ")[1];
-
+  // 2. NextAuth Session fallback (for OAuth/browser cookie requests)
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-    return user;
+    const session = await getServerSession(authOptions);
+    if (session?.user?.id || session?.user?.email) {
+      const query = session.user.id
+        ? { _id: session.user.id }
+        : { email: session.user.email };
+
+      return await User.findOne(query).select("-password").lean();
+    }
   } catch (error) {
     return null;
   }
+
+  return null;
 };
