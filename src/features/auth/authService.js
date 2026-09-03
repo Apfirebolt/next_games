@@ -21,6 +21,8 @@ const handleServiceError = (err) => {
       errorMessage = data.detail;
     } else if (data?.message) {
       errorMessage = data.message;
+    } else if (data?.error) {
+      errorMessage = data.error;
     }
   }
   toast.error(errorMessage);
@@ -59,15 +61,20 @@ const logout = () => {
 
 const updateProfile = async (userData) => {
   try {
-    const response = await httpClient.put(`users/${userData.id}`, userData);
+    // Hits /api/profile with Bearer token supplied by httpClient interceptor
+    const response = await httpClient.put("profile", userData);
     if (response.data) {
       const stored = Cookies.get(COOKIE_NAME);
       const currentUser = stored ? JSON.parse(stored) : {};
-      Cookies.set(
-        COOKIE_NAME,
-        JSON.stringify({ ...currentUser, ...response.data }),
-        COOKIE_OPTIONS
-      );
+
+      // Merge updated profile attributes while preserving existing access token & session
+      const updatedSession = {
+        ...currentUser,
+        ...response.data,
+        access: currentUser.access,
+      };
+
+      Cookies.set(COOKIE_NAME, JSON.stringify(updatedSession), COOKIE_OPTIONS);
       toast.success("Profile updated successfully");
       return response.data;
     }
@@ -76,5 +83,25 @@ const updateProfile = async (userData) => {
   }
 };
 
-const authService = { register, login, logout, updateProfile };
+const changePassword = async (passwords) => {
+  try {
+    // Hits /api/change-password with { currentPassword, newPassword }
+    const response = await httpClient.put("change-password", passwords);
+    if (response.data) {
+      toast.success(response.data.message || "Password updated successfully");
+    }
+    return response.data;
+  } catch (err) {
+    handleServiceError(err);
+  }
+};
+
+const authService = {
+  register,
+  login,
+  logout,
+  updateProfile,
+  changePassword,
+};
+
 export default authService;

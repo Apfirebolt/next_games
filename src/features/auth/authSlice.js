@@ -19,6 +19,7 @@ const extractErrorMessage = (error) => {
   return (
     error.response?.data?.detail ||
     error.response?.data?.message ||
+    error.response?.data?.error ||
     error.message ||
     error.toString()
   );
@@ -31,6 +32,11 @@ const initialState = {
   isSuccess: false,
   isLoading: false,
   message: "",
+  // Dedicated status flags for password management
+  passwordLoading: false,
+  passwordSuccess: false,
+  passwordError: false,
+  passwordMessage: "",
 };
 
 // Register new user
@@ -62,12 +68,24 @@ export const logout = createAsyncThunk("auth/logout", async () => {
   authService.logout();
 });
 
-// Update User Profile (No manual token extraction needed)
+// Update User Profile
 export const updateUserProfile = createAsyncThunk(
   "auth/profile",
   async (userData, thunkAPI) => {
     try {
       return await authService.updateProfile(userData);
+    } catch (error) {
+      return thunkAPI.rejectWithValue(extractErrorMessage(error));
+    }
+  }
+);
+
+// Change User Password
+export const changePassword = createAsyncThunk(
+  "auth/changePassword",
+  async (passwords, thunkAPI) => {
+    try {
+      return await authService.changePassword(passwords);
     } catch (error) {
       return thunkAPI.rejectWithValue(extractErrorMessage(error));
     }
@@ -83,6 +101,10 @@ export const authSlice = createSlice({
       state.isError = false;
       state.isSuccess = false;
       state.message = "";
+      state.passwordLoading = false;
+      state.passwordSuccess = false;
+      state.passwordError = false;
+      state.passwordMessage = "";
     },
   },
   extraReducers: (builder) => {
@@ -122,19 +144,43 @@ export const authSlice = createSlice({
       // Update Profile
       .addCase(updateUserProfile.pending, (state) => {
         state.isLoading = true;
+        state.isError = false;
+        state.isSuccess = false;
       })
       .addCase(updateUserProfile.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isSuccess = true;
         state.profile = action.payload;
         if (state.user) {
-          state.user = { ...state.user, ...action.payload };
+          state.user = {
+            ...state.user,
+            ...action.payload,
+            access: state.user.access,
+          };
         }
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;
+      })
+
+      // Change Password
+      .addCase(changePassword.pending, (state) => {
+        state.passwordLoading = true;
+        state.passwordError = false;
+        state.passwordSuccess = false;
+        state.passwordMessage = "";
+      })
+      .addCase(changePassword.fulfilled, (state, action) => {
+        state.passwordLoading = false;
+        state.passwordSuccess = true;
+        state.passwordMessage = action.payload?.message || "Password updated successfully";
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.passwordLoading = false;
+        state.passwordError = true;
+        state.passwordMessage = action.payload;
       })
 
       // Logout
@@ -144,6 +190,10 @@ export const authSlice = createSlice({
         state.isSuccess = false;
         state.isError = false;
         state.message = "";
+        state.passwordLoading = false;
+        state.passwordSuccess = false;
+        state.passwordError = false;
+        state.passwordMessage = "";
       });
   },
 });
