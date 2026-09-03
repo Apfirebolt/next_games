@@ -1,32 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
-import { login, reset } from "../../features/auth/authSlice";
+import { signIn } from "next-auth/react";
+import { login } from "../../features/auth/authSlice";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const { email, password } = formData;
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { user, isLoading, isError, isSuccess, message } = useSelector(
-    (state) => state.auth
-  );
-
-//   useEffect(() => {
-//     if (isSuccess || user) {
-//       router.push("/");
-//     }
-//     dispatch(reset());
-//   }, [user, isSuccess, isError, message, router, dispatch]);
+  const { isLoading } = useSelector((state) => state.auth);
 
   const onChange = (e) => {
     setFormData((prevState) => ({
@@ -37,16 +30,22 @@ export default function LoginPage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-
     try {
-        await dispatch(login({ email, password })).unwrap();
-
-        router.push("/");
+      await dispatch(login({ email, password })).unwrap();
+      router.push("/");
     } catch (error) {
-      // Error handling is already managed by authService/toasts
+      // Handled by auth slice/toasts
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleLoading(true);
+      await signIn("google", { callbackUrl: "/" });
+    } catch (error) {
+      setIsGoogleLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-carafe text-sand">
@@ -60,7 +59,6 @@ export default function LoginPage() {
           sizes="50vw"
           className="object-cover"
         />
-        {/* Color overlay to blend with the palette */}
         <div className="absolute inset-0 bg-gradient-to-t from-carafe via-carafe/60 to-transparent" />
         <div className="absolute inset-0 bg-brown/20 mix-blend-multiply" />
 
@@ -70,7 +68,7 @@ export default function LoginPage() {
           </Link>
 
           <div className="max-w-md">
-            <span className="inline-flex items-center gap-2 rounded-full border border-brown/40 bg-carafe/80 px-3 py-1 text-xs font-semibold tracking-wider text-tan uppercase backdrop-blur-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-brown/40 bg-carafe/80 px-3 py-1 text-xs font-semibold tracking-wider uppercase text-tan backdrop-blur-sm">
               Welcome Back
             </span>
             <h2 className="mt-4 text-3xl font-extrabold text-white">
@@ -104,11 +102,75 @@ export default function LoginPage() {
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">Sign In</h1>
             <p className="mt-2 text-sm text-tan">
-              Enter your credentials to access your profile.
+              Choose your preferred sign-in method to access your profile.
             </p>
           </div>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-5">
+          {/* Social Auth Option */}
+          <div className="mt-8">
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isGoogleLoading || isLoading}
+              className="flex w-full items-center justify-center gap-3 rounded-lg border border-brown/40 bg-brown/10 px-4 py-3 text-sm font-semibold text-sand transition-all hover:border-tan hover:bg-brown/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-tan disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGoogleLoading ? (
+                <svg
+                  className="h-5 w-5 animate-spin text-sand"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.8C6.2 7.3 8.9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.3 14.8c-.2-.7-.4-1.5-.4-2.8 0-1.2.1-2 .4-2.8L1.6 6.4C.6 8.3 0 10.5 0 12.8s.6 4.5 1.6 6.4l3.7-4.4z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.3-6.7-5.2L1.6 16.4C3.5 20.2 7.4 23.5 12 23.5z"
+                  />
+                </svg>
+              )}
+              Continue with Google
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-brown/30" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-carafe px-3 font-semibold tracking-wider text-tan">
+                Or continue with credentials
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-5">
             <div>
               <label
                 htmlFor="email"
@@ -157,7 +219,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isGoogleLoading}
               className="mt-6 flex w-full items-center justify-center rounded-lg bg-brown px-4 py-3 text-sm font-semibold text-sand shadow-sm transition-all hover:bg-brown/80 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-tan disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? (
@@ -202,7 +264,7 @@ export default function LoginPage() {
 
         {/* Footer Meta */}
         <div className="text-center text-xs text-tan/70">
-          Protected with JWT Session Auth • Softgenie API
+          Level Vault Secure Auth
         </div>
       </div>
     </div>

@@ -1,36 +1,46 @@
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
-import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
 import "./main.css";
 import StoreProvider from "./StoreProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata = {
-  title: "Games - Next.js",
-  description: "This is a games database app built with Next.js",
+  title: {
+    default: "Level Vault — Track, Review & Discover Games",
+    template: "%s | Level Vault",
+  },
+  description:
+    "Crafting immersive digital gaming experiences. Sync your ratings, build your backlog, and track community leaderboards.",
+  metadataBase: new URL(
+    process.env.NEXTAUTH_URL || "https://codelean.in"
+  ),
 };
 
-export default async function MainLayout({ children }) {
-  // Read auth cookie on the server
-  const cookieStore = await cookies();
+function getInitialUser(cookieStore) {
   const rawUser = cookieStore.get("user")?.value;
-  let initialUser = null;
+  if (!rawUser) return null;
 
-  if (rawUser) {
-    try {
-      // Decode URI component in case the cookie value was encoded by js-cookie
-      initialUser = JSON.parse(decodeURIComponent(rawUser));
-    } catch {
-      initialUser = null;
-    }
+  try {
+    return JSON.parse(decodeURIComponent(rawUser));
+  } catch {
+    return null;
   }
+}
+
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const initialUser = getInitialUser(cookieStore);
 
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-sand`}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} min-h-full bg-carafe text-sand antialiased`}>
         <StoreProvider initialUser={initialUser}>
           {children}
           <ToastContainer
@@ -39,11 +49,10 @@ export default async function MainLayout({ children }) {
             hideProgressBar={false}
             newestOnTop
             closeOnClick
-            rtl={false}
             pauseOnFocusLoss
             draggable
             pauseOnHover
-            theme="colored"
+            theme="dark"
           />
         </StoreProvider>
       </body>
