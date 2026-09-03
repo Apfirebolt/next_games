@@ -31,22 +31,20 @@ export async function GET(request, { params }) {
 
     const { id } = await params;
 
-    // 1. Build dynamic query: support both MongoDB _id (hex 24) and catalog numeric id
-    const isObjectId = mongoose.Types.ObjectId.isValid(id) && id.length === 24;
     const isNumeric = !isNaN(Number(id));
 
-    if (!isObjectId && !isNumeric) {
+    if (!isNumeric) {
       return NextResponse.json(
         { error: "Invalid ID format provided." },
         { status: 400 }
       );
     }
 
-    const query = isObjectId ? { _id: id } : { id: Number(id) };
+    const query = { id: Number(id) };
 
     // 2. Find target game
     const targetGame = await Game.findOne(query)
-      .select("id title genre console img publisher developer critic_score similar_games")
+      .select("_id id title genre console img publisher developer critic_score similar_games")
       .lean();
 
     if (!targetGame) {

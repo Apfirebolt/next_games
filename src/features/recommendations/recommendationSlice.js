@@ -12,10 +12,9 @@ export const getSimilarGames = createAsyncThunk(
     }
   },
   {
-    // Prevent refetching if data is already cached
     condition: (gameId, { getState }) => {
       const { recommendations } = getState();
-      const existing = recommendations.byGameId[gameId];
+      const existing = recommendations?.byGameId?.[gameId];
       if (existing && (existing.status === "loading" || existing.status === "succeeded")) {
         return false;
       }
@@ -67,10 +66,13 @@ const recommendationSlice = createSlice({
         };
       })
       .addCase(getSimilarGames.fulfilled, (state, action) => {
-        const { target, similar } = action.payload;
-        state.byGameId[target.id] = {
-          target,
-          similar,
+        // Key by the original dispatched argument (gameId) for consistent cache hits
+        const gameId = action.meta.arg;
+        const { game, similarGames } = action.payload || {};
+
+        state.byGameId[gameId] = {
+          target: game || null,
+          similar: similarGames || [],
           status: "succeeded",
           error: null,
         };
@@ -92,8 +94,8 @@ const recommendationSlice = createSlice({
       })
       .addCase(getUserRecommendations.fulfilled, (state, action) => {
         state.feed.status = "succeeded";
-        state.feed.items = action.payload.recommendations || [];
-        state.feed.isPersonalized = Boolean(action.payload.isPersonalized);
+        state.feed.items = action.payload?.recommendations || [];
+        state.feed.isPersonalized = Boolean(action.payload?.isPersonalized);
       })
       .addCase(getUserRecommendations.rejected, (state, action) => {
         state.feed.status = "failed";
@@ -106,7 +108,7 @@ export const { clearRecommendationCache } = recommendationSlice.actions;
 
 // Selectors
 export const selectSimilarByGameId = (state, gameId) =>
-  state.recommendations.byGameId[gameId] || {
+  state.recommendations?.byGameId?.[gameId] || {
     target: null,
     similar: [],
     status: "idle",

@@ -84,6 +84,7 @@ export async function GET(request) {
 
     const formattedGames = games.map((game) => ({
       id: game._id,
+      gameId: game.id,
       title: game.title,
       genre: game.genre,
       publisher: game.publisher,

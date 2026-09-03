@@ -10,15 +10,18 @@ import Footer from "../../components/Footer";
 import { fetchFavorites, removeFavorite } from "../../features/favorites/favoriteSlice";
 import { getSimilarGames } from "../../features/recommendations/recommendationSlice";
 
+// Stable fallbacks to avoid unnecessary selector rerenders
+const EMPTY_OBJECT = {};
+const EMPTY_ARRAY = [];
+
 export default function FavoritesPage() {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { user } = useSelector((state) => state.auth || {});
-  const { favorites, isLoading } = useSelector(
-    (state) => state.favorites || { favorites: [], isLoading: false }
-  );
-  const byGameId = useSelector((state) => state.recommendations?.byGameId || {});
+  const user = useSelector((state) => state.auth?.user);
+  const favorites = useSelector((state) => state.favorites?.favorites ?? EMPTY_ARRAY);
+  const isLoading = useSelector((state) => state.favorites?.isLoading ?? false);
+  const byGameId = useSelector((state) => state.recommendations?.byGameId ?? EMPTY_OBJECT);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("ALL");
@@ -41,17 +44,16 @@ export default function FavoritesPage() {
     dispatch(removeFavorite(gameId));
   };
 
-  // Open modal and trigger cached/live similarity fetch
-  const handleOpenSimilar = (gameId) => {
-    setActiveModalGameId(gameId);
-    dispatch(getSimilarGames(gameId));
+  const handleOpenSimilar = (game) => {
+    const lookupId = game.gameId || game._id || game.id;
+    setActiveModalGameId(lookupId);
+    dispatch(getSimilarGames(lookupId));
   };
 
   const closeModal = () => {
     setActiveModalGameId(null);
   };
 
-  // Active modal data from Redux cache
   const activeSimilarData = activeModalGameId ? byGameId[activeModalGameId] : null;
 
   const genres = [
@@ -302,16 +304,15 @@ export default function FavoritesPage() {
                   {/* Dual Action Buttons */}
                   <div className="mt-4 grid grid-cols-2 gap-2 border-t border-brown/20 pt-3">
                     <Link
-                      href={`/games/${game.gameId}`}
+                      href={`/games/${game.gameId || game._id}`}
                       className="inline-flex items-center justify-center rounded-lg bg-brown/25 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown/50 hover:text-white"
                     >
                       Details
                     </Link>
 
-                    {/* Similar Games Button */}
                     <button
                       type="button"
-                      onClick={() => handleOpenSimilar(game.gameId)}
+                      onClick={() => handleOpenSimilar(game)}
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-tan/40 bg-tan/10 py-2 text-xs font-semibold text-tan transition-all hover:border-tan hover:bg-tan hover:text-carafe"
                     >
                       <svg
@@ -395,7 +396,7 @@ export default function FavoritesPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {activeSimilarData.similar.map((simGame) => (
                       <div
-                        key={simGame.id}
+                        key={simGame.id || simGame.catalogId}
                         className="group flex gap-3.5 overflow-hidden rounded-xl border border-brown/30 bg-brown/10 p-3 transition-all hover:border-tan/40 hover:bg-brown/20"
                       >
                         <div className="relative h-24 w-18 flex-shrink-0 overflow-hidden rounded-lg bg-carafe">
@@ -414,9 +415,9 @@ export default function FavoritesPage() {
                               <span className="text-[10px] font-bold uppercase text-tan">
                                 {simGame.console || simGame.genre}
                               </span>
-                              {simGame.score && (
+                              {typeof simGame.similarityScore === "number" && (
                                 <span className="rounded bg-tan/20 px-1.5 py-0.5 text-[10px] font-bold text-tan">
-                                  {Math.round(simGame.score * 100)}% Match
+                                  {Math.round(simGame.similarityScore * 100)}% Match
                                 </span>
                               )}
                             </div>
@@ -430,10 +431,10 @@ export default function FavoritesPage() {
 
                           <div className="mt-2 flex items-center justify-between border-t border-brown/20 pt-2">
                             <span className="text-[11px] text-sand/80">
-                              {simGame.critic_score ? `★ ${simGame.critic_score}` : ""}
+                              {simGame.criticScore ? `★ ${simGame.criticScore}` : ""}
                             </span>
                             <Link
-                              href={`/games/${simGame.id}`}
+                              href={`/games/${simGame.catalogId || simGame.id}`}
                               onClick={closeModal}
                               className="text-xs font-semibold text-tan underline-offset-4 hover:underline"
                             >
