@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useSelector, useDispatch } from 'react-redux';
-import { logout, reset } from '../features/auth/authSlice';
+import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSelector, useDispatch } from "react-redux";
+import { logout, reset } from "../features/auth/authSlice";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,6 +16,7 @@ const Header = () => {
   const dispatch = useDispatch();
 
   const { user } = useSelector((state) => state.auth || {});
+  const favorites = useSelector((state) => state.favorites?.favorites || []);
 
   // Guarantees client-side DOM matches server-side DOM on initial render pass
   useEffect(() => {
@@ -23,30 +24,30 @@ const Header = () => {
   }, []);
 
   const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/games', label: 'Games' },
-    { href: '/leaderboard', label: 'Leaderboard' },
-    { href: '/about', label: 'About' },
+    { href: "/", label: "Home" },
+    { href: "/games", label: "Games" },
+    { href: "/leaderboard", label: "Leaderboard" },
+    { href: "/about", label: "About" },
   ];
 
   const handleLogout = () => {
     dispatch(logout());
     dispatch(reset());
     setIsUserMenuOpen(false);
-  
+
     toast.info("Logged out successfully");
     setIsOpen(false);
-    router.push('/login');
+    router.push("/login");
   };
 
   // Only consider authenticated once mounted in the browser
   const isAuthenticated = mounted && Boolean(user);
-  const displayName = user?.firstName || user?.username || user?.email || 'Player';
+  const displayName =
+    user?.firstName || user?.username || user?.email || "Player";
 
   return (
     <header className="sticky top-0 z-50 border-b border-brown/30 bg-carafe/95 backdrop-blur-md transition-all">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5 lg:px-8">
-        
         {/* Brand Logo */}
         <Link href="/" className="group flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brown font-black text-lg text-sand shadow-sm transition-transform duration-200 group-hover:scale-105">
@@ -86,13 +87,17 @@ const Header = () => {
                   </span>
                   <span className="max-w-[110px] truncate">{displayName}</span>
                   <svg
-                    className={`h-3.5 w-3.5 text-tan transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`}
+                    className={`h-3.5 w-3.5 text-tan transition-transform duration-200 ${isUserMenuOpen ? "rotate-180" : ""}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth="2.5"
                     stroke="currentColor"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
                   </svg>
                 </button>
 
@@ -100,16 +105,49 @@ const Header = () => {
                   <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl border border-brown/40 bg-carafe p-1.5 shadow-2xl backdrop-blur-xl">
                     <div className="border-b border-brown/30 px-3 py-2 text-[11px] text-tan">
                       Signed in as <br />
-                      <span className="font-bold text-sand truncate block">{user.email}</span>
+                      <span className="font-bold text-sand truncate block">
+                        {user.email}
+                      </span>
                     </div>
+
+                    <Link
+                      href="/favorites"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
+                    >
+                      <svg
+                        className="h-4 w-4 text-tan"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
+                        />
+                      </svg>
+                      Saved Vault ({favorites?.length || 0})
+                    </Link>
 
                     <Link
                       href="/profile"
                       onClick={() => setIsUserMenuOpen(false)}
                       className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
                     >
-                      <svg className="h-4 w-4 text-tan" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                      <svg
+                        className="h-4 w-4 text-tan"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                        />
                       </svg>
                       Profile Settings
                     </Link>
@@ -119,8 +157,18 @@ const Header = () => {
                       onClick={handleLogout}
                       className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-danger transition-colors hover:bg-danger/10"
                     >
-                      <svg className="h-4 w-4 text-danger" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                      <svg
+                        className="h-4 w-4 text-danger"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
+                        />
                       </svg>
                       Log Out
                     </button>
@@ -154,11 +202,25 @@ const Header = () => {
           aria-expanded={isOpen}
           aria-label="Toggle navigation menu"
         >
-          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth="1.5"
+            stroke="currentColor"
+          >
             {isOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+              />
             )}
           </svg>
         </button>
@@ -184,7 +246,8 @@ const Header = () => {
               {isAuthenticated ? (
                 <>
                   <div className="px-3 py-2 text-xs text-tan">
-                    Signed in as <span className="font-bold text-white">{displayName}</span>
+                    Signed in as{" "}
+                    <span className="font-bold text-white">{displayName}</span>
                   </div>
                   <Link
                     href="/profile"
