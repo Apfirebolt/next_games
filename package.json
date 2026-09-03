@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
     "next": "16.3.2",
+    "next-auth": "^4.24.15",
     "next-swagger-doc": "^0.5.0",
     "pg": "^8.23.0",
     "pg-query-stream": "^4.17.0",

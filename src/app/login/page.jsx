@@ -64,7 +64,7 @@ export default function LoginPage() {
 
         <div className="absolute inset-0 flex flex-col justify-between p-12">
           <Link href="/" className="text-xl font-bold tracking-tight text-white">
-            Level<span className="text-tan">Vault</span>
+            Level<span className="text-tan"> Vault</span>
           </Link>
 
           <div className="max-w-md">
