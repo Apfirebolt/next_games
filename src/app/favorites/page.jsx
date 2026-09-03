@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from "react-redux";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import { fetchFavorites, removeFavorite } from "../../features/favorites/favoriteSlice";
+import { getSimilarGames } from "../../features/recommendations/recommendationSlice";
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -17,11 +18,12 @@ export default function FavoritesPage() {
   const { favorites, isLoading } = useSelector(
     (state) => state.favorites || { favorites: [], isLoading: false }
   );
+  const byGameId = useSelector((state) => state.recommendations?.byGameId || {});
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("ALL");
+  const [activeModalGameId, setActiveModalGameId] = useState(null);
 
-  // Fetch favorites on mount when user is present
   useEffect(() => {
     if (user) {
       dispatch(fetchFavorites());
@@ -39,13 +41,24 @@ export default function FavoritesPage() {
     dispatch(removeFavorite(gameId));
   };
 
-  // Extract unique genres for quick filtering
+  // Open modal and trigger cached/live similarity fetch
+  const handleOpenSimilar = (gameId) => {
+    setActiveModalGameId(gameId);
+    dispatch(getSimilarGames(gameId));
+  };
+
+  const closeModal = () => {
+    setActiveModalGameId(null);
+  };
+
+  // Active modal data from Redux cache
+  const activeSimilarData = activeModalGameId ? byGameId[activeModalGameId] : null;
+
   const genres = [
     "ALL",
     ...new Set(favorites.map((fav) => fav.genre).filter(Boolean)),
   ];
 
-  // Filter saved list by search query and genre
   const filteredFavorites = favorites.filter((fav) => {
     const matchesSearch =
       fav.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -87,7 +100,6 @@ export default function FavoritesPage() {
               </p>
             </div>
 
-            {/* Catalog Action Link */}
             <Link
               href="/games"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-brown px-4 py-2.5 text-xs font-semibold text-sand shadow-sm transition-all hover:bg-brown/80 hover:text-white sm:self-start"
@@ -135,7 +147,6 @@ export default function FavoritesPage() {
                 </svg>
               </div>
 
-              {/* Genre Pills */}
               {genres.length > 2 && (
                 <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto">
                   {genres.map((genre) => (
@@ -179,7 +190,6 @@ export default function FavoritesPage() {
             </button>
           </div>
         ) : isLoading ? (
-          /* Loading Skeletons */
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {[...Array(8)].map((_, i) => (
               <div
@@ -189,7 +199,6 @@ export default function FavoritesPage() {
             ))}
           </div>
         ) : favorites.length === 0 ? (
-          /* Zero Saved Items State */
           <div className="my-auto flex flex-col items-center justify-center py-20 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brown/40 bg-brown/20 text-tan">
               <svg className="h-7 w-7 fill-none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -212,7 +221,6 @@ export default function FavoritesPage() {
             </Link>
           </div>
         ) : filteredFavorites.length === 0 ? (
-          /* Search Filter Empty State */
           <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
             <p className="text-base font-medium text-sand">No saved games match &quot;{searchQuery}&quot;</p>
             <button
@@ -244,21 +252,18 @@ export default function FavoritesPage() {
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
 
-                  {/* Console Tag */}
                   {game.console && (
                     <span className="absolute left-2.5 top-2.5 rounded-md border border-brown/40 bg-carafe/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sand backdrop-blur-md">
                       {game.console}
                     </span>
                   )}
 
-                  {/* Critic Score Badge */}
                   {game.critic_score ? (
                     <span className="absolute right-2.5 top-2.5 rounded-md bg-brown/90 px-2 py-0.5 text-[11px] font-bold text-sand backdrop-blur-md">
                       ★ {game.critic_score}
                     </span>
                   ) : null}
 
-                  {/* Quick Remove Action (Hover Overlay) */}
                   <button
                     type="button"
                     onClick={(e) => handleRemove(e, game.gameId)}
@@ -294,18 +299,154 @@ export default function FavoritesPage() {
                     </div>
                   </div>
 
-                  {/* Action Link to Game Details */}
-                  <div className="mt-4 flex items-center gap-2 border-t border-brown/20 pt-3">
+                  {/* Dual Action Buttons */}
+                  <div className="mt-4 grid grid-cols-2 gap-2 border-t border-brown/20 pt-3">
                     <Link
                       href={`/games/${game.gameId}`}
-                      className="inline-flex flex-1 items-center justify-center rounded-lg bg-brown/30 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown hover:text-white"
+                      className="inline-flex items-center justify-center rounded-lg bg-brown/25 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown/50 hover:text-white"
                     >
-                      View Details
+                      Details
                     </Link>
+
+                    {/* Similar Games Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSimilar(game.gameId)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-tan/40 bg-tan/10 py-2 text-xs font-semibold text-tan transition-all hover:border-tan hover:bg-tan hover:text-carafe"
+                    >
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="2"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
+                        />
+                      </svg>
+                      <span>Similar</span>
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Similar Games Modal Drawer */}
+        {activeModalGameId && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+            onClick={closeModal}
+          >
+            <div
+              className="relative max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-brown/40 bg-carafe shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-brown/30 bg-brown/15 px-6 py-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    Similar Games
+                    {activeSimilarData?.target?.title && (
+                      <span className="font-normal text-tan"> to {activeSimilarData.target.title}</span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-tan/70">Matched via Cosine Similarity on genre, developer, and platform</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-lg border border-brown/40 p-1.5 text-tan transition-colors hover:bg-brown/30 hover:text-white"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="max-h-[calc(90vh-80px)] overflow-y-auto p-6">
+                {activeSimilarData?.status === "loading" ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-28 animate-pulse rounded-xl border border-brown/20 bg-brown/10" />
+                    ))}
+                  </div>
+                ) : activeSimilarData?.status === "failed" ? (
+                  <div className="py-12 text-center text-danger">
+                    <p className="font-medium">{activeSimilarData.error || "Failed to load similar games."}</p>
+                    <button
+                      type="button"
+                      onClick={() => dispatch(getSimilarGames(activeModalGameId))}
+                      className="mt-3 rounded-lg bg-brown px-4 py-1.5 text-xs text-sand hover:text-white"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : !activeSimilarData?.similar || activeSimilarData.similar.length === 0 ? (
+                  <div className="py-12 text-center text-tan">
+                    <p>No similar titles computed yet for this game.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {activeSimilarData.similar.map((simGame) => (
+                      <div
+                        key={simGame.id}
+                        className="group flex gap-3.5 overflow-hidden rounded-xl border border-brown/30 bg-brown/10 p-3 transition-all hover:border-tan/40 hover:bg-brown/20"
+                      >
+                        <div className="relative h-24 w-18 flex-shrink-0 overflow-hidden rounded-lg bg-carafe">
+                          <Image
+                            src={showGameImage(simGame.img)}
+                            alt={simGame.title}
+                            fill
+                            sizes="72px"
+                            className="object-cover"
+                          />
+                        </div>
+
+                        <div className="flex flex-1 flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-bold uppercase text-tan">
+                                {simGame.console || simGame.genre}
+                              </span>
+                              {simGame.score && (
+                                <span className="rounded bg-tan/20 px-1.5 py-0.5 text-[10px] font-bold text-tan">
+                                  {Math.round(simGame.score * 100)}% Match
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="mt-1 line-clamp-1 text-sm font-bold text-white group-hover:text-tan">
+                              {simGame.title}
+                            </h4>
+                            <p className="line-clamp-1 text-[11px] text-tan/70">
+                              {simGame.developer || simGame.publisher || "N/A"}
+                            </p>
+                          </div>
+
+                          <div className="mt-2 flex items-center justify-between border-t border-brown/20 pt-2">
+                            <span className="text-[11px] text-sand/80">
+                              {simGame.critic_score ? `★ ${simGame.critic_score}` : ""}
+                            </span>
+                            <Link
+                              href={`/games/${simGame.id}`}
+                              onClick={closeModal}
+                              className="text-xs font-semibold text-tan underline-offset-4 hover:underline"
+                            >
+                              View Game →
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </main>
