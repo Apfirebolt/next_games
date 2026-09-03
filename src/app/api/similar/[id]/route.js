@@ -1,7 +1,7 @@
 // src/app/api/similar/[id]/route.js
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import dbConnect from "../../../../lib/dbConnect";
+import { getAuthenticatedUser } from "../../../../lib/auth";
 import Game from "../../../../models/game";
 
 /**
@@ -10,16 +10,20 @@ import Game from "../../../../models/game";
  *   get:
  *     summary: Retrieve detailed information for all similar games by game ID
  *     tags: [Recommendations]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema:
- *           type: string
- *         description: Either the MongoDB _id (ObjectId) or the numeric catalog id
+ *           type: integer
+ *         description: Numeric catalog ID of the game
  *     responses:
  *       200:
  *         description: List of detailed similar games retrieved successfully
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
  *       404:
  *         description: Game not found
  *       500:
@@ -27,12 +31,21 @@ import Game from "../../../../models/game";
  */
 export async function GET(request, { params }) {
   try {
+    // 1. Authenticate user before querying the database
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing, invalid, or expired token" },
+        { status: 401 }
+      );
+    }
+
     await dbConnect();
 
     const { id } = await params;
 
     const isNumeric = !isNaN(Number(id));
-
     if (!isNumeric) {
       return NextResponse.json(
         { error: "Invalid ID format provided." },
@@ -118,7 +131,7 @@ export async function GET(request, { params }) {
       {
         status: 200,
         headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
         },
       }
     );

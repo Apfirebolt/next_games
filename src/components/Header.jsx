@@ -250,6 +250,26 @@ const Header = () => {
                     <span className="font-bold text-white">{displayName}</span>
                   </div>
                   <Link
+                    href="/favorites"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="block rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
+                  >
+                    <svg
+                      className="h-4 w-4 text-tan"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
+                      />
+                    </svg>
+                    Saved Vault ({favorites?.length || 0})
+                  </Link>
+                  <Link
                     href="/profile"
                     onClick={() => setIsOpen(false)}
                     className="block rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"

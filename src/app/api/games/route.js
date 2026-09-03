@@ -1,6 +1,7 @@
 // src/app/api/games/route.js
 import { NextResponse } from "next/server";
 import dbConnect from "../../../lib/dbConnect";
+import { getAuthenticatedUser } from "../../../lib/auth";
 import Game from "../../../models/game";
 
 /**
@@ -9,6 +10,8 @@ import Game from "../../../models/game";
  *   get:
  *     summary: Retrieve paginated list of games
  *     tags: [Games]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
@@ -49,6 +52,15 @@ import Game from "../../../models/game";
  *                       type: boolean
  *                     hasPrevPage:
  *                       type: boolean
+ *       401:
+ *         description: Unauthorized - Missing or invalid token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       500:
  *         description: Internal server error
  *         content:
@@ -58,18 +70,28 @@ import Game from "../../../models/game";
  */
 export async function GET(request) {
   try {
+    // 1. Authenticate user before performing database queries
+    const user = await getAuthenticatedUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing, invalid, or expired token" },
+        { status: 401 }
+      );
+    }
+
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
 
-    // Parse and sanitize query parameters
+    // 2. Parse and sanitize query parameters
     const page = Math.max(1, parseInt(searchParams.get("page"), 10) || 1);
     const requestedLimit = parseInt(searchParams.get("limit"), 10) || 50;
     const limit = Math.min(Math.max(1, requestedLimit), 50);
 
     const skip = (page - 1) * limit;
 
-    // Run count and paginated query in parallel
+    // 3. Run count and paginated query concurrently
     const [totalItems, games] = await Promise.all([
       Game.countDocuments({}),
       Game.find({})
