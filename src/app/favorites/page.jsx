@@ -356,7 +356,7 @@ export default function FavoritesPage() {
                       <span className="font-normal text-tan"> to {activeSimilarData.target.title}</span>
                     )}
                   </h3>
-                  <p className="text-xs text-tan/70">Matched via Cosine Similarity on genre, developer, and platform</p>
+                  <p className="text-xs text-tan/70">Based on genre, developer, and platform</p>
                 </div>
                 <button
                   type="button"

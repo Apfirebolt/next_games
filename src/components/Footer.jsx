@@ -1,100 +1,91 @@
 import Link from 'next/link';
 
+const FOOTER_NAV = [
+  {
+    title: 'Explore',
+    links: [
+      { label: 'All Games', href: '/games' },
+      { label: 'Leaderboard', href: '/leaderboard' },
+      { label: 'Recommendations', href: '/recommendation' },
+      { label: 'About Us', href: '/about' },
+      { label: 'News & Updates', href: '/blog' },
+    ],
+  },
+  {
+    title: 'Support',
+    links: [
+      { label: 'Help Center', href: '/support' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Terms of Service', href: '/terms' },
+      { label: 'Contact', href: '/contact' },
+    ],
+  },
+];
+
+const LEGAL_LINKS = [
+  { label: 'Terms', href: '/terms' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Cookies', href: '/cookies' },
+];
+
 const Footer = () => {
+  const currentYear = new Date().getFullYear();
+
   return (
-    <footer className="bg-carafe text-sand border-t border-brown/30">
-      {/* Main Footer Content */}
+    <footer className="border-t border-brown/30 bg-carafe text-sand">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           
           {/* Brand & Description */}
           <div className="space-y-4 md:col-span-2">
-            <span className="text-xl font-bold tracking-tight text-white">
-              Next Games
-            </span>
-            <p className="max-w-sm text-sm text-tan leading-relaxed">
+            <Link 
+              href="/" 
+              className="inline-block text-xl font-bold tracking-tight text-white transition-opacity hover:opacity-90"
+            >
+              Level Vault
+            </Link>
+            <p className="max-w-sm text-sm leading-relaxed text-tan">
               Crafting immersive digital gaming experiences with performance-first design and modern technology.
             </p>
           </div>
 
-          {/* Navigation Links */}
-          <div>
-            <h3 className="text-sm font-semibold tracking-wider text-white uppercase">
-              Explore
-            </h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
-              <li>
-                <Link href="/games" className="transition-colors hover:text-white">
-                  All Games
-                </Link>
-              </li>
-              <li>
-                <Link href="/leaderboard" className="transition-colors hover:text-white">
-                  Leaderboard
-                </Link>
-              </li>
-              <li>
-                <Link href="/recommendation" className="transition-colors hover:text-white">
-                  Recommendations
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="transition-colors hover:text-white">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="transition-colors hover:text-white">
-                  News & Updates
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal / Contact Links */}
-          <div>
-            <h3 className="text-sm font-semibold tracking-wider text-white uppercase">
-              Support
-            </h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
-              <li>
-                <Link href="/support" className="transition-colors hover:text-white">
-                  Help Center
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy" className="transition-colors hover:text-white">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="transition-colors hover:text-white">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors hover:text-white">
-                  Contact
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* Dynamic Navigation Sections */}
+          {FOOTER_NAV.map((section) => (
+            <div key={section.title}>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-white">
+                {section.title}
+              </h3>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                {section.links.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="transition-colors hover:text-white"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-brown/20 pt-8 sm:flex-row text-xs text-tan">
-          <p>&copy; {new Date().getFullYear()} Next Games. All rights reserved.</p>
-          <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-white transition-colors">
-              Terms
-            </Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">
-              Privacy
-            </Link>
-            <Link href="/cookies" className="hover:text-white transition-colors">
-              Cookies
-            </Link>
-          </div>
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-brown/20 pt-8 text-xs text-tan sm:flex-row">
+          <p>&copy; {currentYear} Level Vault. All rights reserved.</p>
+          
+          <nav aria-label="Legal links" className="flex space-x-6">
+            {LEGAL_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="transition-colors hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
     </footer>

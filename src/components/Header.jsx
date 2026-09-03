@@ -55,7 +55,7 @@ const Header = () => {
             L
           </span>
           <span className="text-xl font-black tracking-tight text-white transition-colors">
-            Level<span className="text-tan">Vault</span>
+            Level <span className="text-tan">Vault</span>
           </span>
         </Link>
 
