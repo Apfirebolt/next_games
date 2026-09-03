@@ -249,7 +249,7 @@ export default function LeaderboardPage() {
                         {/* Action Link */}
                         <td className="whitespace-nowrap px-6 py-4 text-right">
                           <Link
-                            href={`/users/${userItem._id}`}
+                            href={`/users/${userItem.id}`}
                             className="inline-flex items-center gap-1 rounded-lg border border-brown/40 bg-brown/30 px-3 py-1.5 text-xs font-semibold text-sand transition-all hover:border-tan/40 hover:bg-brown hover:text-white"
                           >
                             <span>Profile</span>

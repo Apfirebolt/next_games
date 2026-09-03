@@ -38,6 +38,7 @@ export const fetchUserById = createAsyncThunk(
   "user/fetchById",
   async (userId, thunkAPI) => {
     try {
+        console.log("Fetching user by ID:", userId); // Debugging log
       return await userService.getUserById(userId);
     } catch (error) {
       const message = extractErrorMessage(error);
