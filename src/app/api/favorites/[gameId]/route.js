@@ -1,8 +1,8 @@
 // src/app/api/favorites/[gameId]/route.js
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
-import Favorite from "@/models/favorite";
-import { getAuthenticatedUser } from "@/lib/auth";
+import dbConnect from "../../../../lib/dbConnect";
+import Favorite from "../../../../models/favorite";
+import { getAuthenticatedUser } from "../../../../lib/auth";
 
 /**
  * @swagger

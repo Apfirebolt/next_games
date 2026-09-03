@@ -1,5 +1,4 @@
-// src/services/favoriteService.js
-import httpClient from "./interceptor";
+import httpClient from "../../plugins/interceptor";
 
 const API_URL = "favorites";
 

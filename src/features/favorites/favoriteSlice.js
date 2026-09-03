@@ -1,6 +1,6 @@
 // src/features/favorites/favoriteSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import favoriteService from "@/services/favoriteService";
+import favoriteService from "./favoriteService";
 import { toast } from "react-toastify";
 
 // Helper to extract human-readable error messages
