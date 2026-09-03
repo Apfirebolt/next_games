@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
+import { useSession, signOut } from "next-auth/react";
 import { logout, reset } from "../features/auth/authSlice";
 
 const Header = () => {
@@ -15,10 +17,10 @@ const Header = () => {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { user } = useSelector((state) => state.auth || {});
+  const { data: session } = useSession();
+  const { user: reduxUser } = useSelector((state) => state.auth || {});
   const favorites = useSelector((state) => state.favorites?.favorites || []);
 
-  // Guarantees client-side DOM matches server-side DOM on initial render pass
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -27,24 +29,34 @@ const Header = () => {
     { href: "/", label: "Home" },
     { href: "/games", label: "Games" },
     { href: "/leaderboard", label: "Leaderboard" },
-     { href: "/recommendation", label: "Recommendations" },
+    { href: "/recommendation", label: "Recommendations" },
     { href: "/about", label: "About" },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // 1. Clear Redux and custom cookies
     dispatch(logout());
     dispatch(reset());
     setIsUserMenuOpen(false);
+    setIsOpen(false);
+
+    // 2. Terminate NextAuth session cookie if logged in via Google
+    await signOut({ redirect: false });
 
     toast.info("Logged out successfully");
-    setIsOpen(false);
     router.push("/login");
   };
 
-  // Only consider authenticated once mounted in the browser
+  // Combine both sources
+  const user = reduxUser || session?.user;
   const isAuthenticated = mounted && Boolean(user);
   const displayName =
-    user?.firstName || user?.username || user?.email || "Player";
+    user?.firstName ||
+    user?.username ||
+    user?.name?.split(" ")[0] ||
+    user?.email ||
+    "Player";
+  const userAvatar = user?.image || null;
 
   return (
     <header className="sticky top-0 z-50 border-b border-brown/30 bg-carafe/95 backdrop-blur-md transition-all">
@@ -81,14 +93,26 @@ const Header = () => {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2.5 rounded-full border border-brown/40 bg-brown/15 py-1.5 pl-2 pr-3.5 text-xs font-semibold text-sand transition-all hover:border-tan hover:bg-brown/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-tan"
+                  className="flex items-center gap-2.5 rounded-full border border-brown/40 bg-brown/15 py-1 pl-1.5 pr-3.5 text-xs font-semibold text-sand transition-all hover:border-tan hover:bg-brown/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-tan"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brown font-bold text-white shadow-inner">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
+                  {userAvatar ? (
+                    <Image
+                      src={userAvatar}
+                      alt={displayName}
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 rounded-full object-cover border border-brown/40"
+                    />
+                  ) : (
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brown font-bold text-white shadow-inner">
+                      {displayName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
                   <span className="max-w-[110px] truncate">{displayName}</span>
                   <svg
-                    className={`h-3.5 w-3.5 text-tan transition-transform duration-200 ${isUserMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-3.5 w-3.5 text-tan transition-transform duration-200 ${
+                      isUserMenuOpen ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth="2.5"
@@ -211,11 +235,7 @@ const Header = () => {
             stroke="currentColor"
           >
             {isOpen ? (
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             ) : (
               <path
                 strokeLinecap="round"
@@ -246,28 +266,25 @@ const Header = () => {
             <div className="my-2 border-t border-brown/30 pt-2">
               {isAuthenticated ? (
                 <>
-                  <div className="px-3 py-2 text-xs text-tan">
-                    Signed in as{" "}
-                    <span className="font-bold text-white">{displayName}</span>
+                  <div className="flex items-center gap-2.5 px-3 py-2 text-xs text-tan">
+                    {userAvatar && (
+                      <Image
+                        src={userAvatar}
+                        alt={displayName}
+                        width={24}
+                        height={24}
+                        className="h-6 w-6 rounded-full object-cover border border-brown/40"
+                      />
+                    )}
+                    <span>
+                      Signed in as <strong className="text-white">{displayName}</strong>
+                    </span>
                   </div>
                   <Link
                     href="/favorites"
-                    onClick={() => setIsUserMenuOpen(false)}
+                    onClick={() => setIsOpen(false)}
                     className="block rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
                   >
-                    <svg
-                      className="h-4 w-4 text-tan"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth="1.5"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
-                      />
-                    </svg>
                     Saved Vault ({favorites?.length || 0})
                   </Link>
                   <Link

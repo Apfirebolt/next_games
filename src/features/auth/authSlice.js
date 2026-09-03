@@ -2,18 +2,6 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import authService from "./authService";
 import Cookies from "js-cookie";
 
-// SSR-Safe cookie retrieval for Next.js
-const getStoredUser = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const item = Cookies.get("user");
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error("Failed to parse user cookie:", error);
-    return null;
-  }
-};
-
 // Helper: Extract human-readable error for rejectWithValue
 const extractErrorMessage = (error) => {
   return (
@@ -25,8 +13,9 @@ const extractErrorMessage = (error) => {
   );
 };
 
+// Initial state remains neutral; StoreProvider seeds initialUser during store creation
 const initialState = {
-  user: typeof window !== "undefined" ? getStoredUser() : null,
+  user: null,
   profile: null,
   isError: false,
   isSuccess: false,
@@ -66,6 +55,7 @@ export const login = createAsyncThunk(
 // Logout user
 export const logout = createAsyncThunk("auth/logout", async () => {
   authService.logout();
+  Cookies.remove("user");
 });
 
 // Update User Profile
@@ -105,6 +95,17 @@ export const authSlice = createSlice({
       state.passwordSuccess = false;
       state.passwordError = false;
       state.passwordMessage = "";
+    },
+    // Synchronizes Google/NextAuth session into the Redux state and cookies
+    setCredentials: (state, action) => {
+      state.user = action.payload;
+      state.isSuccess = true;
+      state.isError = false;
+      state.message = "";
+
+      if (typeof window !== "undefined" && action.payload) {
+        Cookies.set("user", JSON.stringify(action.payload), { expires: 7 });
+      }
     },
   },
   extraReducers: (builder) => {
@@ -157,6 +158,9 @@ export const authSlice = createSlice({
             ...action.payload,
             access: state.user.access,
           };
+          if (typeof window !== "undefined") {
+            Cookies.set("user", JSON.stringify(state.user), { expires: 7 });
+          }
         }
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
@@ -175,7 +179,8 @@ export const authSlice = createSlice({
       .addCase(changePassword.fulfilled, (state, action) => {
         state.passwordLoading = false;
         state.passwordSuccess = true;
-        state.passwordMessage = action.payload?.message || "Password updated successfully";
+        state.passwordMessage =
+          action.payload?.message || "Password updated successfully";
       })
       .addCase(changePassword.rejected, (state, action) => {
         state.passwordLoading = false;
@@ -198,5 +203,5 @@ export const authSlice = createSlice({
   },
 });
 
-export const { reset } = authSlice.actions;
+export const { reset, setCredentials } = authSlice.actions;
 export default authSlice.reducer;

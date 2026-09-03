@@ -4,26 +4,33 @@ import { useRef, useEffect } from "react";
 import { Provider, useDispatch, useSelector } from "react-redux";
 import { SessionProvider, useSession } from "next-auth/react";
 import { makeStore } from "../store";
+import { setCredentials, logout } from "../features/auth/authSlice";
 
-// Syncs NextAuth Google session into Redux state
 function AuthSync() {
   const { data: session, status } = useSession();
   const dispatch = useDispatch();
-  const currentUser = useSelector((state) => state.auth.user);
+  const currentUser = useSelector((state) => state.auth?.user);
 
   useEffect(() => {
+    // 1. User logged in via NextAuth / Google
     if (status === "authenticated" && session?.user && !currentUser) {
-      dispatch({
-        type: "auth/setCredentials", // Or your slice action e.g., setCredentials(session.user)
-        payload: {
+      dispatch(
+        setCredentials({
           id: session.user.id,
           name: session.user.name,
+          username: session.user.username || session.user.name,
+          firstName: session.user.name?.split(" ")[0] || "Player",
           email: session.user.email,
           image: session.user.image,
           isAdmin: session.user.isAdmin ?? false,
           token: session.user.token ?? null,
-        },
-      });
+        })
+      );
+    }
+
+    // 2. User logged out via NextAuth
+    if (status === "unauthenticated" && currentUser?.provider === "google") {
+      dispatch(logout());
     }
   }, [session, status, currentUser, dispatch]);
 

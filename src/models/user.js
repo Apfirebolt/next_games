@@ -6,12 +6,12 @@ const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
-      required: [true, "First name is required"],
+      required: false,
       trim: true,
     },
     lastName: {
       type: String,
-      required: [true, "Last name is required"],
+      required: false,
       trim: true,
     },
     username: {
@@ -29,8 +29,18 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters long"],
+      required: function () {
+        return !this.provider || this.provider === "credentials";
+      },
+      validate: {
+        validator: function (value) {
+          if (!this.password && this.provider === "google") {
+            return true;
+          }
+          return typeof value === "string" && value.length >= 6;
+        },
+        message: "Password must be at least 6 characters long",
+      },
     },
     image: {
       type: String,
@@ -54,11 +64,16 @@ const userSchema = new mongoose.Schema(
 
 // Method to verify password against hashed password
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  // Prevent bcrypt crash if OAuth user has no password
+  if (!this.password) {
+    return false;
+  }
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
+// Async middleware: removed unused `next` parameter and added `!this.password` guard
+userSchema.pre("save", async function () {
+  if (!this.isModified("password") || !this.password) {
     return;
   }
 
