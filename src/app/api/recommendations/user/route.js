@@ -1,7 +1,7 @@
 // src/app/api/recommendations/user/route.js
 import { NextResponse } from "next/server";
 import dbConnect from "../../../../lib/dbConnect";
-import { getAuthenticatedUser } from "../../../../lib";
+import { getAuthenticatedUser } from "../../../../lib/auth";
 import { RecommendationService } from "../../../../services/recommendationService";
 
 /**

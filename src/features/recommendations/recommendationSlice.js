@@ -23,12 +23,12 @@ export const getSimilarGames = createAsyncThunk(
   }
 );
 
-// Async thunk: Feed recommendations for current user
+// Async thunk: Recommendations based on user favorites
 export const getUserRecommendations = createAsyncThunk(
   "recommendations/getUserRecommendations",
-  async (limit = 12, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      return await recommendationClientService.getUserRecommendations(limit);
+      return await recommendationClientService.getUserRecommendations();
     } catch (err) {
       return rejectWithValue(err.message);
     }
@@ -36,10 +36,14 @@ export const getUserRecommendations = createAsyncThunk(
 );
 
 const initialState = {
-  feed: {
+  userRecommendations: {
     items: [],
-    isPersonalized: false,
-    status: "idle",
+    isEligible: false,
+    requiredCount: 3,
+    currentCount: 0,
+    targetCount: 0,
+    message: "",
+    status: "idle", // 'idle' | 'loading' | 'succeeded' | 'failed'
     error: null,
   },
   byGameId: {},
@@ -51,6 +55,9 @@ const recommendationSlice = createSlice({
   reducers: {
     clearRecommendationCache: (state) => {
       state.byGameId = {};
+    },
+    resetUserRecommendations: (state) => {
+      state.userRecommendations = initialState.userRecommendations;
     },
   },
   extraReducers: (builder) => {
@@ -66,7 +73,6 @@ const recommendationSlice = createSlice({
         };
       })
       .addCase(getSimilarGames.fulfilled, (state, action) => {
-        // Key by the original dispatched argument (gameId) for consistent cache hits
         const gameId = action.meta.arg;
         const { game, similarGames } = action.payload || {};
 
@@ -87,34 +93,46 @@ const recommendationSlice = createSlice({
         };
       })
 
-      // --- Feed / User Recommendations ---
+      // --- User Recommendations (Based on Favorites) ---
       .addCase(getUserRecommendations.pending, (state) => {
-        state.feed.status = "loading";
-        state.feed.error = null;
+        state.userRecommendations.status = "loading";
+        state.userRecommendations.error = null;
       })
       .addCase(getUserRecommendations.fulfilled, (state, action) => {
-        state.feed.status = "succeeded";
-        state.feed.items = action.payload?.recommendations || [];
-        state.feed.isPersonalized = Boolean(action.payload?.isPersonalized);
+        const {
+          isEligible = false,
+          currentCount = 0,
+          requiredCount = 3,
+          targetCount = 0,
+          recommendations = [],
+          message = "",
+        } = action.payload || {};
+
+        state.userRecommendations.status = "succeeded";
+        state.userRecommendations.isEligible = isEligible;
+        state.userRecommendations.currentCount = currentCount;
+        state.userRecommendations.requiredCount = requiredCount;
+        state.userRecommendations.targetCount = targetCount;
+        state.userRecommendations.items = recommendations;
+        state.userRecommendations.message = message;
+        state.userRecommendations.error = null;
       })
       .addCase(getUserRecommendations.rejected, (state, action) => {
-        state.feed.status = "failed";
-        state.feed.error = action.payload || "Failed to load feed recommendations";
+        state.userRecommendations.status = "failed";
+        state.userRecommendations.error = action.payload || "Failed to load recommendations";
       });
   },
 });
 
-export const { clearRecommendationCache } = recommendationSlice.actions;
+export const { clearRecommendationCache, resetUserRecommendations } = recommendationSlice.actions;
 
 // Selectors
-export const selectSimilarByGameId = (state, gameId) =>
-  state.recommendations?.byGameId?.[gameId] || {
-    target: null,
-    similar: [],
-    status: "idle",
-    error: null,
-  };
+const DEFAULT_BY_ID = { target: null, similar: [], status: "idle", error: null };
 
-export const selectRecommendationFeed = (state) => state.recommendations.feed;
+export const selectSimilarByGameId = (state, gameId) =>
+  state.recommendations?.byGameId?.[gameId] || DEFAULT_BY_ID;
+
+export const selectUserRecommendations = (state) =>
+  state.recommendations?.userRecommendations || initialState.userRecommendations;
 
 export default recommendationSlice.reducer;
