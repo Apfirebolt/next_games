@@ -31,6 +31,7 @@
     "react-dom": "^19.2.8",
     "react-redux": "^9.3.0",
     "react-toastify": "^11.1.0",
+    "recharts": "^3.10.1",
     "redux": "^5.0.1",
     "swagger-ui-react": "^5.32.14"
   },
