@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -13,8 +15,16 @@ import {
   respondToFriendRequest,
   deleteFriendship,
 } from "../../features/friends/friendSlice";
+import {
+  startConversation,
+  sendMessage,
+} from "../../features/conversations/conversationSlice";
+
+// Dynamically import MDEditor to disable SSR and prevent Next.js hydration issues
+const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 export default function FriendsPage() {
+  const router = useRouter();
   const dispatch = useDispatch();
 
   const currentUser = useSelector((state) => state.auth?.user);
@@ -39,6 +49,11 @@ export default function FriendsPage() {
 
   const [searchFilter, setSearchFilter] = useState("");
   const [unfriendConfirmId, setUnfriendConfirmId] = useState(null);
+
+  // Message modal state
+  const [activeMessageFriend, setActiveMessageFriend] = useState(null);
+  const [messageContent, setMessageContent] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // Load friends and pending requests on mount
   useEffect(() => {
@@ -80,6 +95,46 @@ export default function FriendsPage() {
     });
   };
 
+  // Open conversation modal
+  const openMessageModal = (friend) => {
+    setActiveMessageFriend(friend);
+    setMessageContent("");
+  };
+
+  const closeMessageModal = () => {
+    setActiveMessageFriend(null);
+    setMessageContent("");
+    setIsSendingMessage(false);
+  };
+
+  // Submit markdown message
+  const handleSendMarkdownMessage = async () => {
+    if (!messageContent.trim() || !activeMessageFriend) return;
+
+    const friendId = activeMessageFriend._id || activeMessageFriend.id;
+
+    try {
+      setIsSendingMessage(true);
+      // 1. Find or create the conversation thread
+      const convAction = await dispatch(startConversation(friendId)).unwrap();
+      const conversationId = convAction._id;
+
+      // 2. Dispatch the message
+      await dispatch(
+        sendMessage({
+          conversationId,
+          content: messageContent.trim(),
+        })
+      ).unwrap();
+
+      closeMessageModal();
+    } catch {
+      // Errors handled via toast inside the slice
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-carafe text-sand">
       <Header />
@@ -108,7 +163,7 @@ export default function FriendsPage() {
                 My <span className="text-tan">Friends</span>
               </h1>
               <p className="mt-1 text-sm text-tan">
-                Manage your connections and respond to pending invitations.
+                Manage your connections and communicate with fellow collectors.
               </p>
             </div>
 
@@ -209,44 +264,70 @@ export default function FriendsPage() {
                     key={item.friendshipId}
                     className="flex flex-col justify-between rounded-xl border border-brown/30 bg-brown/10 p-4 backdrop-blur-sm transition hover:border-brown/60"
                   >
-                    <div className="flex items-center gap-3">
-                      {/* Avatar */}
-                      <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-tan/30 bg-carafe font-bold uppercase text-tan">
-                        {friend?.image ? (
-                          <Image
-                            src={friend.image}
-                            alt={friend.username || "Friend"}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          friend?.username?.charAt(0) || "P"
-                        )}
+                    <div>
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-tan/30 bg-carafe font-bold uppercase text-tan">
+                          {friend?.image ? (
+                            <Image
+                              src={friend.image}
+                              alt={friend.username || "Friend"}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            friend?.username?.charAt(0) || "P"
+                          )}
+                        </div>
+
+                        {/* Info */}
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/users/${friendId}`}
+                            className="truncate text-sm font-bold text-white transition hover:text-tan block"
+                          >
+                            @{friend?.username}
+                          </Link>
+                          <p className="truncate text-xs text-sand/70">
+                            {`${friend?.firstName || ""} ${friend?.lastName || ""}`.trim() ||
+                              friend?.email ||
+                              "—"}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Info */}
-                      <div className="min-w-0 flex-1">
-                        <Link
-                          href={`/users/${friendId}`}
-                          className="truncate text-sm font-bold text-white transition hover:text-tan block"
+                      {/* Quick Action: Send Message */}
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => openMessageModal(friend)}
+                          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-tan/30 bg-tan/10 py-1.5 text-xs font-semibold text-tan transition hover:border-tan hover:bg-tan hover:text-carafe"
                         >
-                          @{friend?.username}
-                        </Link>
-                        <p className="truncate text-xs text-sand/70">
-                          {`${friend?.firstName || ""} ${friend?.lastName || ""}`.trim() ||
-                            friend?.email ||
-                            "—"}
-                        </p>
+                          <svg
+                            className="h-3.5 w-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="2"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+                            />
+                          </svg>
+                          Message
+                        </button>
                       </div>
                     </div>
 
-                    {/* Actions */}
+                    {/* Bottom Actions */}
                     <div className="mt-4 flex items-center justify-between border-t border-brown/20 pt-3 text-xs">
                       <Link
                         href={`/users/${friendId}`}
                         className="font-semibold text-tan hover:text-white transition"
                       >
-                        View Profile →
+                        Profile →
                       </Link>
 
                       {isConfirming ? (
@@ -427,6 +508,104 @@ export default function FriendsPage() {
           </div>
         </section>
       </main>
+
+      {/* 3. MARKDOWN COMPOSER MODAL */}
+      {activeMessageFriend && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-carafe/80 p-4 backdrop-blur-sm">
+          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-brown/40 bg-carafe p-6 shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-brown/30 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-tan/30 bg-brown/30 font-bold text-tan">
+                  {activeMessageFriend.image ? (
+                    <Image
+                      src={activeMessageFriend.image}
+                      alt={activeMessageFriend.username}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    activeMessageFriend.username?.charAt(0) || "P"
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    Send Message to @{activeMessageFriend.username}
+                  </h3>
+                  <p className="text-xs text-tan/70">
+                    Supports CommonMark & GitHub flavored markdown
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeMessageModal}
+                className="rounded-lg p-1.5 text-tan/70 hover:bg-brown/20 hover:text-white"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Markdown Editor Canvas */}
+            <div className="my-4 flex-1 overflow-y-auto" data-color-mode="dark">
+              <MDEditor
+                value={messageContent}
+                onChange={(val) => setMessageContent(val || "")}
+                height={260}
+                preview="edit"
+                visibleDragbar={false}
+                className="!border-brown/40 !bg-carafe/90"
+              />
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center justify-between border-t border-brown/30 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  closeMessageModal();
+                  router.push("/messages");
+                }}
+                className="text-xs font-semibold text-tan hover:text-white transition"
+              >
+                Go to Inbox &rarr;
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={closeMessageModal}
+                  disabled={isSendingMessage}
+                  className="rounded-lg border border-brown/40 bg-brown/20 px-4 py-2 text-xs font-semibold text-sand transition hover:bg-brown/40 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendMarkdownMessage}
+                  disabled={isSendingMessage || !messageContent.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-tan px-4 py-2 text-xs font-bold text-carafe shadow-md transition hover:bg-white disabled:opacity-50"
+                >
+                  {isSendingMessage ? (
+                    <>
+                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Message"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
