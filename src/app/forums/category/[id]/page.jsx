@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import Header from "../../../../components/Header";
 import Footer from "../../../../components/Footer";
+import httpClient from "../../../../plugins/interceptor";
 import { fetchCategories } from "../../../../features/categories/categorySlice";
 import {
   fetchThreads,
@@ -23,32 +24,24 @@ export default function CategoryDetailPage() {
 
   const user = useSelector((state) => state.auth?.user);
   const categories = useSelector(
-    (state) => state.categories?.categories ?? EMPTY_ARRAY
+    (state) => state.categories?.categories ?? EMPTY_ARRAY,
   );
   const isCategoriesLoading = useSelector(
-    (state) => state.categories?.isLoading ?? false
+    (state) => state.categories?.isLoading ?? false,
   );
 
   const threads = useSelector((state) => state.threads?.threads ?? EMPTY_ARRAY);
   const isThreadsLoading = useSelector(
-    (state) => state.threads?.isLoading ?? false
+    (state) => state.threads?.isLoading ?? false,
   );
   const isCreateLoading = useSelector(
-    (state) => state.threads?.isCreateLoading ?? false
+    (state) => state.threads?.isCreateLoading ?? false,
   );
   const viewMode = useSelector((state) => state.threads?.viewMode ?? "table");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("ALL"); // "ALL" | "PINNED" | "UNANSWERED"
-
-  // Create Thread Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newThreadForm, setNewThreadForm] = useState({
-    title: "",
-    content: "",
-    imageUrl: "",
-    imagePublicId: "",
-  });
 
   useEffect(() => {
     if (!categories.length) {
@@ -61,7 +54,7 @@ export default function CategoryDetailPage() {
 
   const currentCategory = useMemo(() => {
     return categories.find(
-      (cat) => cat._id === categoryId || cat.slug === categoryId
+      (cat) => cat._id === categoryId || cat.slug === categoryId,
     );
   }, [categories, categoryId]);
 
@@ -69,11 +62,11 @@ export default function CategoryDetailPage() {
     const totalThreads = threads.length;
     const totalReplies = threads.reduce(
       (acc, t) => acc + (Number(t.replyCount) || 0),
-      0
+      0,
     );
     const totalViews = threads.reduce(
       (acc, t) => acc + (Number(t.viewsCount) || 0),
-      0
+      0,
     );
 
     const participants = new Set();
@@ -95,19 +88,21 @@ export default function CategoryDetailPage() {
   }, [threads]);
 
   const filteredThreads = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     return threads.filter((t) => {
       const matchesSearch =
-        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.creator?.username?.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        t.title?.toLowerCase().includes(query) ||
+        t.creator?.username?.toLowerCase().includes(query);
 
       const matchesFilter =
         filterType === "ALL"
           ? true
           : filterType === "PINNED"
-          ? t.isPinned
-          : filterType === "UNANSWERED"
-          ? (t.replyCount || 0) === 0
-          : true;
+            ? t.isPinned
+            : filterType === "UNANSWERED"
+              ? (t.replyCount || 0) === 0
+              : true;
 
       return matchesSearch && matchesFilter;
     });
@@ -118,52 +113,14 @@ export default function CategoryDetailPage() {
       router.push("/login");
       return;
     }
-    setNewThreadForm({
-      title: "",
-      content: "",
-      imageUrl: "",
-      imagePublicId: "",
-    });
     setIsCreateModalOpen(true);
   };
 
-  const handleCloseCreateModal = () => {
+  const handleThreadCreated = (createdThreadId) => {
     setIsCreateModalOpen(false);
-  };
-
-  const handleCreateThreadSubmit = async (e) => {
-    e.preventDefault();
-    if (!newThreadForm.title.trim() || !newThreadForm.content.trim()) return;
-
-    const payload = {
-      categoryId: currentCategory?._id || categoryId,
-      title: newThreadForm.title,
-      content: newThreadForm.content,
-      media: newThreadForm.imageUrl
-        ? {
-            url: newThreadForm.imageUrl,
-            publicId: newThreadForm.imagePublicId || undefined,
-          }
-        : undefined,
-    };
-
-    const result = await dispatch(createThread(payload));
-    if (!result.error) {
-      handleCloseCreateModal();
-      // Optional: automatically route to the newly created thread
-      if (result.payload?.thread?._id) {
-        router.push(`/forums/${result.payload.thread._id}`);
-      }
+    if (createdThreadId) {
+      router.push(`/forums/${createdThreadId}`);
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "No activity";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
   };
 
   const isLoading = isCategoriesLoading || isThreadsLoading;
@@ -184,7 +141,7 @@ export default function CategoryDetailPage() {
           </span>
         </div>
 
-        {/* Top Forum Banner */}
+        {/* Top Banner & Analytics */}
         <div className="rounded-2xl border border-brown/30 bg-brown/10 p-6 backdrop-blur-sm sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -201,7 +158,6 @@ export default function CategoryDetailPage() {
               </p>
             </div>
 
-            {/* Modal Trigger for New Thread */}
             <button
               type="button"
               onClick={handleOpenCreateModal}
@@ -224,44 +180,12 @@ export default function CategoryDetailPage() {
             </button>
           </div>
 
-          {/* Statistical Insights Grid */}
+          {/* Stats Bar */}
           <div className="mt-6 grid grid-cols-2 gap-3 border-t border-brown/20 pt-6 sm:grid-cols-4 lg:grid-cols-5">
-            <div className="rounded-xl border border-brown/30 bg-carafe/60 p-3.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
-                Total Topics
-              </span>
-              <p className="mt-1 text-2xl font-black text-white">
-                {stats.totalThreads}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-brown/30 bg-carafe/60 p-3.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
-                Total Responses
-              </span>
-              <p className="mt-1 text-2xl font-black text-white">
-                {stats.totalReplies}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-brown/30 bg-carafe/60 p-3.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
-                Thread Views
-              </span>
-              <p className="mt-1 text-2xl font-black text-white">
-                {stats.totalViews}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-brown/30 bg-carafe/60 p-3.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
-                Participants
-              </span>
-              <p className="mt-1 text-2xl font-black text-white">
-                {stats.uniqueContributors}
-              </p>
-            </div>
-
+            <StatCard label="Total Topics" value={stats.totalThreads} />
+            <StatCard label="Total Responses" value={stats.totalReplies} />
+            <StatCard label="Thread Views" value={stats.totalViews} />
+            <StatCard label="Participants" value={stats.uniqueContributors} />
             <div className="col-span-2 rounded-xl border border-brown/30 bg-carafe/60 p-3.5 sm:col-span-4 lg:col-span-1">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
                 Avg Replies / Thread
@@ -272,7 +196,7 @@ export default function CategoryDetailPage() {
             </div>
           </div>
 
-          {/* Search, Filter & View Controls */}
+          {/* Search, Filters, View Modes */}
           <div className="mt-6 flex flex-col gap-3 border-t border-brown/20 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full sm:w-72">
               <input
@@ -319,7 +243,6 @@ export default function CategoryDetailPage() {
                 ))}
               </div>
 
-              {/* View Switcher */}
               <div className="flex items-center rounded-lg border border-brown/40 bg-carafe/90 p-0.5">
                 <button
                   type="button"
@@ -374,7 +297,7 @@ export default function CategoryDetailPage() {
           </div>
         </div>
 
-        {/* Content Section */}
+        {/* Dynamic Content Body */}
         {isLoading ? (
           <div className="mt-8 space-y-4">
             {[...Array(6)].map((_, i) => (
@@ -417,320 +340,549 @@ export default function CategoryDetailPage() {
             </button>
           </div>
         ) : viewMode === "table" ? (
-          /* Table View */
-          <div className="mt-8 overflow-hidden rounded-2xl border border-brown/30 bg-brown/10 backdrop-blur-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-brown/20 bg-carafe/40 font-semibold uppercase tracking-wider text-tan/70">
-                  <tr>
-                    <th className="px-6 py-3.5">Thread Title</th>
-                    <th className="px-4 py-3.5 text-center">Replies</th>
-                    <th className="px-4 py-3.5 text-center">Views</th>
-                    <th className="px-6 py-3.5 text-right">Latest Post</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-brown/20">
-                  {filteredThreads.map((thread) => (
-                    <tr
-                      key={thread._id}
-                      className="transition-colors hover:bg-brown/20"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-start gap-3">
-                          {thread.isPinned && (
-                            <span className="mt-0.5 rounded border border-tan/40 bg-tan/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-tan">
-                              Pinned
-                            </span>
-                          )}
-                          <div>
-                            <Link
-                              href={`/forums/${thread._id}`}
-                              className="font-bold text-white transition-colors hover:text-tan"
-                            >
-                              {thread.title}
-                            </Link>
-                            <div className="mt-1 flex items-center gap-2 text-[11px] text-tan/70">
-                              <span>By</span>
-                              <span className="font-semibold text-tan">
-                                {thread.creator?.username || "Anonymous"}
-                              </span>
-                              <span>•</span>
-                              <span>{formatDate(thread.createdAt)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4 text-center font-semibold text-sand">
-                        {thread.replyCount ?? 0}
-                      </td>
-
-                      <td className="px-4 py-4 text-center text-tan/80">
-                        {thread.viewsCount ?? 0}
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        {thread.latestPost ? (
-                          <div className="text-[11px]">
-                            <p className="font-semibold text-white">
-                              {thread.latestPost.username || "Member"}
-                            </p>
-                            <p className="text-tan/60">
-                              {formatDate(thread.latestPost.createdAt)}
-                            </p>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-tan/40">
-                            No replies
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ThreadTableView threads={filteredThreads} />
         ) : (
-          /* Card View */
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredThreads.map((thread) => (
-              <div
-                key={thread._id}
-                className="group flex flex-col justify-between rounded-xl border border-brown/30 bg-carafe/60 p-4 transition-all hover:-translate-y-0.5 hover:border-tan/40 hover:bg-brown/20"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase text-tan">
-                      {currentCategory?.title || "Forum"}
-                    </span>
-                    {thread.isPinned && (
-                      <span className="rounded bg-tan/20 px-1.5 py-0.5 text-[10px] font-bold text-tan">
-                        Pinned
-                      </span>
-                    )}
-                  </div>
-
-                  <Link
-                    href={`/forums/${thread._id}`}
-                    className="mt-2 block font-bold text-white transition-colors group-hover:text-tan line-clamp-2"
-                  >
-                    {thread.title}
-                  </Link>
-
-                  <p className="mt-2 text-xs text-tan/70">
-                    By{" "}
-                    <span className="font-medium text-white">
-                      {thread.creator?.username || "Anonymous"}
-                    </span>{" "}
-                    on {formatDate(thread.createdAt)}
-                  </p>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between border-t border-brown/20 pt-3 text-xs text-tan/80">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth="2"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
-                        />
-                      </svg>
-                      {thread.replyCount ?? 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth="2"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                      {thread.viewsCount ?? 0}
-                    </span>
-                  </div>
-
-                  <Link
-                    href={`/forums/${thread._id}`}
-                    className="font-semibold text-tan underline-offset-4 hover:underline"
-                  >
-                    View Thread →
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ThreadCardView
+            threads={filteredThreads}
+            categoryTitle={currentCategory?.title}
+          />
         )}
 
-        {/* Modal: Create New Thread */}
-        {isCreateModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-            onClick={handleCloseCreateModal}
-          >
-            <div
-              className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-brown/40 bg-carafe shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
+        {/* Modal Window */}
+        <CreateThreadModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          category={currentCategory}
+          categoryId={categoryId}
+          isCreateLoading={isCreateLoading}
+          onSuccess={handleThreadCreated}
+        />
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subcomponents & Helpers
+// ---------------------------------------------------------------------------
+
+function StatCard({ label, value }) {
+  return (
+    <div className="rounded-xl border border-brown/30 bg-carafe/60 p-3.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-tan/70">
+        {label}
+      </span>
+      <p className="mt-1 text-2xl font-black text-white">{value}</p>
+    </div>
+  );
+}
+
+function formatDate(dateString) {
+  if (!dateString) return "No activity";
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function ThreadTableView({ threads }) {
+  return (
+    <div className="mt-8 overflow-hidden rounded-2xl border border-brown/30 bg-brown/10 backdrop-blur-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead className="border-b border-brown/20 bg-carafe/40 font-semibold uppercase tracking-wider text-tan/70">
+            <tr>
+              <th className="px-6 py-3.5">Thread Title</th>
+              <th className="px-4 py-3.5 text-center">Replies</th>
+              <th className="px-4 py-3.5 text-center">Views</th>
+              <th className="px-6 py-3.5 text-right">Latest Post</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-brown/20">
+            {threads.map((thread) => (
+              <tr
+                key={thread._id}
+                className="transition-colors hover:bg-brown/20"
+              >
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    {thread.media?.url && (
+                      <img
+                        src={thread.media.url}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-lg border border-brown/40 object-cover"
+                      />
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {thread.isPinned && (
+                          <span className="rounded border border-tan/40 bg-tan/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-tan">
+                            Pinned
+                          </span>
+                        )}
+                        <Link
+                          href={`/forums/${thread._id}`}
+                          className="font-bold text-white transition-colors hover:text-tan"
+                        >
+                          {thread.title}
+                        </Link>
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] text-tan/70">
+                        <span>By</span>
+                        <span className="font-semibold text-tan">
+                          {thread.creator?.username || "Anonymous"}
+                        </span>
+                        <span>•</span>
+                        <span>{formatDate(thread.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <td className="px-4 py-4 text-center font-semibold text-sand">
+                  {thread.replyCount ?? 0}
+                </td>
+
+                <td className="px-4 py-4 text-center text-tan/80">
+                  {thread.viewsCount ?? 0}
+                </td>
+
+                <td className="px-6 py-4 text-right">
+                  {thread.latestPost ? (
+                    <div className="text-[11px]">
+                      <p className="font-semibold text-white">
+                        {thread.latestPost.username || "Member"}
+                      </p>
+                      <p className="text-tan/60">
+                        {formatDate(thread.latestPost.createdAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-tan/40">No replies</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ThreadCardView({ threads, categoryTitle }) {
+  return (
+    <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {threads.map((thread) => (
+        <div
+          key={thread._id}
+          className="group flex flex-col justify-between rounded-xl border border-brown/30 bg-carafe/60 p-4 transition-all hover:-translate-y-0.5 hover:border-tan/40 hover:bg-brown/20"
+        >
+          <div>
+            {thread.media?.url && (
+              <div className="mb-3 h-36 w-full overflow-hidden rounded-lg border border-brown/30">
+                <img
+                  src={thread.media.url}
+                  alt={thread.title}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase text-tan">
+                {categoryTitle || "Forum"}
+              </span>
+              {thread.isPinned && (
+                <span className="rounded bg-tan/20 px-1.5 py-0.5 text-[10px] font-bold text-tan">
+                  Pinned
+                </span>
+              )}
+            </div>
+
+            <Link
+              href={`/forums/${thread._id}`}
+              className="mt-2 block font-bold text-white transition-colors group-hover:text-tan line-clamp-2"
             >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-brown/30 bg-brown/15 px-6 py-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-tan/30 bg-tan/10 text-tan">
+              {thread.title}
+            </Link>
+
+            <p className="mt-2 text-xs text-tan/70">
+              By{" "}
+              <span className="font-medium text-white">
+                {thread.creator?.username || "Anonymous"}
+              </span>{" "}
+              on {formatDate(thread.createdAt)}
+            </p>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-brown/20 pt-3 text-xs text-tan/80">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+                  />
+                </svg>
+                {thread.replyCount ?? 0}
+              </span>
+              <span className="flex items-center gap-1">
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="2"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                {thread.viewsCount ?? 0}
+              </span>
+            </div>
+
+            <Link
+              href={`/forums/${thread._id}`}
+              className="font-semibold text-tan underline-offset-4 hover:underline"
+            >
+              View Thread →
+            </Link>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CreateThreadModal({
+  isOpen,
+  onClose,
+  category,
+  categoryId,
+  isCreateLoading,
+  onSuccess,
+}) {
+  const dispatch = useDispatch();
+  const fileInputRef = useRef(null);
+
+  const [form, setForm] = useState({
+    title: "",
+    content: "",
+    imageUrl: "",
+    imagePublicId: "",
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  if (!isOpen) return null;
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select a valid image file (JPEG, PNG, WEBP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Image size must be under 5MB.");
+      return;
+    }
+
+    setUploadError("");
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // httpClient attaches Bearer token from cookies via its request interceptor
+      const response = await httpClient.post("upload", formData);
+      const data = response.data;
+
+      if (data.url) {
+        setForm((prev) => ({
+          ...prev,
+          imageUrl: data.url,
+          imagePublicId: data.publicId || "",
+        }));
+      }
+    } catch (err) {
+      const message =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        "Network error while uploading image.";
+      setUploadError(message);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, imageUrl: "", imagePublicId: "" }));
+    setUploadError("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim() || !form.content.trim()) return;
+
+    const mediaPayload =
+      form.imageUrl && form.imageUrl.trim() !== ""
+        ? {
+            url: form.imageUrl.trim(),
+            publicId: form.imagePublicId?.trim() || null,
+          }
+        : null;
+
+    const payload = {
+      categoryId: category?._id || categoryId,
+      title: form.title.trim(),
+      content: form.content.trim(),
+      media: mediaPayload,
+    };
+
+    const result = await dispatch(createThread(payload));
+    if (!result.error) {
+      const createdId =
+        result.payload?.data?.thread?._id || result.payload?.thread?._id;
+      onSuccess(createdId);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-brown/40 bg-carafe shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-brown/30 bg-brown/15 px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-tan/30 bg-tan/10 text-tan">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="2.5"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 4.5v15m7.5-7.5h-15"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">
+                Start a New Thread
+              </h3>
+              <p className="text-xs text-tan">
+                Posting in{" "}
+                <span className="font-semibold text-white">
+                  {category?.title || "Forum"}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-brown/40 p-1.5 text-tan transition-colors hover:bg-brown/30 hover:text-white"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col space-y-4 overflow-y-auto p-6"
+        >
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
+              Thread Topic / Title *
+            </label>
+            <input
+              type="text"
+              required
+              value={form.title}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, title: e.target.value }))
+              }
+              placeholder="e.g. Recommended poly strings for crisp control?"
+              className="w-full rounded-lg border border-brown/40 bg-carafe/90 px-3.5 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
+              Opening Message *
+            </label>
+            <textarea
+              rows={5}
+              required
+              value={form.content}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, content: e.target.value }))
+              }
+              placeholder="Provide details, context, questions, or your initial thoughts..."
+              className="w-full rounded-xl border border-brown/40 bg-carafe/90 p-3.5 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
+            />
+          </div>
+
+          {/* Internal Server File Upload Route */}
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-tan">
+              Attach Image
+            </label>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/png, image/jpeg, image/webp"
+              className="hidden"
+            />
+
+            {form.imageUrl ? (
+              <div className="relative overflow-hidden rounded-xl border border-brown/40 bg-carafe/90 p-3">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={form.imageUrl}
+                    alt="Upload Preview"
+                    className="h-16 w-16 rounded-lg border border-brown/50 object-cover"
+                  />
+                  <div className="flex-1 overflow-hidden">
+                    <p className="truncate text-xs font-bold text-white">
+                      Image attached successfully
+                    </p>
+                    <p className="truncate text-[11px] text-tan/70">
+                      {form.imagePublicId || form.imageUrl}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/20"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-brown/40 bg-carafe/50 p-5 text-center transition-colors ${
+                  isUploading
+                    ? "cursor-not-allowed opacity-60"
+                    : "cursor-pointer hover:border-tan/60 hover:bg-brown/15"
+                }`}
+              >
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-tan border-t-transparent" />
+                    <span className="text-xs font-medium text-tan">
+                      Uploading image...
+                    </span>
+                  </div>
+                ) : (
+                  <>
                     <svg
-                      className="h-4 w-4"
+                      className="h-8 w-8 text-tan/70"
                       fill="none"
                       viewBox="0 0 24 24"
-                      strokeWidth="2"
+                      strokeWidth="1.5"
                       stroke="currentColor"
                     >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M12 4.5v15m7.5-7.5h-15"
+                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
                       />
                     </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white">
-                      Start a New Thread
-                    </h3>
-                    <p className="text-xs text-tan">
-                      Posting in{" "}
-                      <span className="font-semibold text-white">
-                        {currentCategory?.title || "Forum"}
-                      </span>
+                    <p className="mt-2 text-xs font-semibold text-white">
+                      Click to upload an image
                     </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCloseCreateModal}
-                  className="rounded-lg border border-brown/40 p-1.5 text-tan transition-colors hover:bg-brown/30 hover:text-white"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
+                    <p className="text-[11px] text-tan/60">
+                      PNG, JPG, or WEBP up to 5MB
+                    </p>
+                  </>
+                )}
               </div>
+            )}
 
-              {/* Modal Form Body */}
-              <form
-                onSubmit={handleCreateThreadSubmit}
-                className="flex flex-1 flex-col overflow-y-auto p-6 space-y-4"
-              >
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
-                    Thread Topic / Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newThreadForm.title}
-                    onChange={(e) =>
-                      setNewThreadForm({
-                        ...newThreadForm,
-                        title: e.target.value,
-                      })
-                    }
-                    placeholder="e.g. Recommended poly strings for crisp control?"
-                    className="w-full rounded-lg border border-brown/40 bg-carafe/90 px-3.5 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
-                    Opening Message *
-                  </label>
-                  <textarea
-                    rows={6}
-                    required
-                    value={newThreadForm.content}
-                    onChange={(e) =>
-                      setNewThreadForm({
-                        ...newThreadForm,
-                        content: e.target.value,
-                      })
-                    }
-                    placeholder="Provide details, context, questions, or your initial thoughts..."
-                    className="w-full rounded-xl border border-brown/40 bg-carafe/90 p-3.5 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
-                    Optional Image URL (Cloudinary)
-                  </label>
-                  <input
-                    type="url"
-                    value={newThreadForm.imageUrl}
-                    onChange={(e) =>
-                      setNewThreadForm({
-                        ...newThreadForm,
-                        imageUrl: e.target.value,
-                      })
-                    }
-                    placeholder="https://res.cloudinary.com/..."
-                    className="w-full rounded-lg border border-brown/40 bg-carafe/90 px-3.5 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
-                  />
-                </div>
-
-                {/* Modal Footer Controls */}
-                <div className="flex items-center justify-end gap-2.5 border-t border-brown/20 pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCloseCreateModal}
-                    className="rounded-lg border border-brown/40 px-4 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown/20"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={
-                      isCreateLoading ||
-                      !newThreadForm.title.trim() ||
-                      !newThreadForm.content.trim()
-                    }
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-tan px-5 py-2 text-xs font-bold text-carafe shadow-md transition-all hover:bg-white disabled:opacity-50"
-                  >
-                    {isCreateLoading ? "Publishing..." : "Publish Thread"}
-                  </button>
-                </div>
-              </form>
-            </div>
+            {uploadError && (
+              <p className="mt-1 text-[11px] font-semibold text-red-400">
+                {uploadError}
+              </p>
+            )}
           </div>
-        )}
-      </main>
 
-      <Footer />
+          {/* Footer Controls */}
+          <div className="flex items-center justify-end gap-2.5 border-t border-brown/20 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-brown/40 px-4 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown/20"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={
+                isCreateLoading ||
+                isUploading ||
+                !form.title.trim() ||
+                !form.content.trim()
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg bg-tan px-5 py-2 text-xs font-bold text-carafe shadow-md transition-all hover:bg-white disabled:opacity-50"
+            >
+              {isCreateLoading ? "Publishing..." : "Publish Thread"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

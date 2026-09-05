@@ -41,8 +41,6 @@ export default function ThreadDetailPage() {
 
   // Form State
   const [replyContent, setReplyContent] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [imagePublicId, setImagePublicId] = useState("");
 
   // Floating Quote Popover Coordinates
   const [quoteSelectionState, setQuoteSelectionState] = useState(null);
@@ -116,14 +114,11 @@ export default function ThreadDetailPage() {
       content: replyContent,
       parentId: replyToParentId,
       quote: activeQuote || undefined,
-      media: imageUrl ? { url: imageUrl, publicId: imagePublicId } : undefined,
     };
 
     const result = await dispatch(createPost(payload));
     if (!result.error) {
       setReplyContent("");
-      setImageUrl("");
-      setImagePublicId("");
     }
   };
 
@@ -162,7 +157,7 @@ export default function ThreadDetailPage() {
           <button
             type="button"
             onClick={applySelectedQuote}
-            className="flex items-center gap-1.5 rounded-lg border border-tan/40 bg-carafe px-3 py-1.5 text-xs font-bold text-tan shadow-2xl backdrop-blur-md transition-all hover:bg-tan hover:text-carafe hover:scale-105"
+            className="flex items-center gap-1.5 rounded-lg border border-tan/40 bg-carafe px-3 py-1.5 text-xs font-bold text-tan shadow-2xl backdrop-blur-md transition-all hover:scale-105 hover:bg-tan hover:text-carafe"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -205,71 +200,88 @@ export default function ThreadDetailPage() {
           </span>
         </div>
 
-        {/* Thread Header Banner */}
+        {/* Thread Header with Hero Banner */}
         {currentThread && (
-          <div className="rounded-2xl border border-brown/30 bg-brown/10 p-6 backdrop-blur-sm sm:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {currentThread.isPinned && (
-                    <span className="rounded border border-tan/40 bg-tan/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-tan">
-                      Pinned
-                    </span>
-                  )}
-                  {currentThread.isLocked && (
-                    <span className="rounded border border-danger/40 bg-danger/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-danger">
-                      Locked
-                    </span>
-                  )}
-                  <span className="rounded-md border border-brown/40 bg-brown/20 px-2 py-0.5 text-[11px] font-semibold text-tan">
-                    {currentThread.categoryId?.title || "Discussion"}
-                  </span>
-                </div>
-
-                <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                  {currentThread.title}
-                </h1>
-
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-tan">
-                  <span>
-                    Started by{" "}
-                    <span className="font-bold text-white">
-                      {currentThread.creator?.username || "Anonymous"}
-                    </span>
-                  </span>
-                  <span>•</span>
-                  <span>{formatDate(currentThread.createdAt)}</span>
-                  <span>•</span>
-                  <span>{currentThread.viewsCount ?? 0} Views</span>
-                  <span>•</span>
-                  <span>{currentThread.replyCount ?? 0} Replies</span>
-                </div>
+          <div className="overflow-hidden rounded-2xl border border-brown/30 bg-brown/10 backdrop-blur-sm">
+            {/* Hero Image Banner */}
+            {currentThread.media?.url && (
+              <div className="relative h-60 w-full overflow-hidden border-b border-brown/30 bg-carafe sm:h-80 lg:h-96">
+                <Image
+                  src={currentThread.media.url}
+                  alt={currentThread.title}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 1024px"
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-carafe via-carafe/30 to-transparent" />
               </div>
+            )}
 
-              {!currentThread.isLocked && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    replyEditorRef.current?.scrollIntoView({ behavior: "smooth" })
-                  }
-                  className="inline-flex items-center gap-2 rounded-xl bg-tan px-4 py-2.5 text-xs font-bold text-carafe shadow-sm transition-all hover:bg-white sm:self-start"
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="2.5"
-                    stroke="currentColor"
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {currentThread.isPinned && (
+                      <span className="rounded border border-tan/40 bg-tan/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-tan">
+                        Pinned
+                      </span>
+                    )}
+                    {currentThread.isLocked && (
+                      <span className="rounded border border-danger/40 bg-danger/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-danger">
+                        Locked
+                      </span>
+                    )}
+                    <span className="rounded-md border border-brown/40 bg-brown/20 px-2 py-0.5 text-[11px] font-semibold text-tan">
+                      {currentThread.categoryId?.title || "Discussion"}
+                    </span>
+                  </div>
+
+                  <h1 className="mt-2 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                    {currentThread.title}
+                  </h1>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-tan">
+                    <span>
+                      Started by{" "}
+                      <span className="font-bold text-white">
+                        {currentThread.creator?.username || "Anonymous"}
+                      </span>
+                    </span>
+                    <span>•</span>
+                    <span>{formatDate(currentThread.createdAt)}</span>
+                    <span>•</span>
+                    <span>{currentThread.viewsCount ?? 0} Views</span>
+                    <span>•</span>
+                    <span>{currentThread.replyCount ?? 0} Replies</span>
+                  </div>
+                </div>
+
+                {!currentThread.isLocked && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      replyEditorRef.current?.scrollIntoView({ behavior: "smooth" })
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl bg-tan px-4 py-2.5 text-xs font-bold text-carafe shadow-sm transition-all hover:bg-white sm:self-start"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-                    />
-                  </svg>
-                  <span>Post Reply</span>
-                </button>
-              )}
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="2.5"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                      />
+                    </svg>
+                    <span>Post Reply</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -322,17 +334,6 @@ export default function ThreadDetailPage() {
                   <div className="whitespace-pre-line text-sm leading-relaxed text-sand selection:bg-tan selection:text-carafe">
                     {openingPost.content}
                   </div>
-
-                  {openingPost.media?.url && (
-                    <div className="relative mt-4 aspect-video max-h-96 w-full overflow-hidden rounded-xl border border-brown/30 bg-carafe">
-                      <Image
-                        src={openingPost.media.url}
-                        alt="Post attachment"
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 {/* Footer Controls */}
@@ -364,7 +365,7 @@ export default function ThreadDetailPage() {
               </article>
             )}
 
-            {/* Replies Stream (Tree Layout with Depth Indentations) */}
+            {/* Replies Stream */}
             {replies.length > 0 && (
               <div className="space-y-4 pt-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-tan">
@@ -372,7 +373,7 @@ export default function ThreadDetailPage() {
                 </h3>
 
                 {replies.map((post, index) => {
-                  const depth = Math.min(post.depth || 0, 4); // Clamp indents to max 4 levels
+                  const depth = Math.min(post.depth || 0, 4);
 
                   return (
                     <div
@@ -418,8 +419,8 @@ export default function ThreadDetailPage() {
                         <div className="space-y-3 p-5">
                           {/* Quote Callout Box */}
                           {post.quote?.selectedText && (
-                            <div className="rounded-lg border-l-2 border-tan bg-brown/15 p-3 text-xs italic text-tan/90 font-serif">
-                              <span className="block font-sans not-italic text-[10px] font-bold uppercase text-tan mb-1">
+                            <div className="rounded-lg border-l-2 border-tan bg-brown/15 p-3 font-serif text-xs italic text-tan/90">
+                              <span className="mb-1 block font-sans text-[10px] font-bold uppercase not-italic text-tan">
                                 {post.quote.authorName} wrote:
                               </span>
                               &ldquo;{post.quote.selectedText}&rdquo;
@@ -429,17 +430,6 @@ export default function ThreadDetailPage() {
                           <div className="whitespace-pre-line text-xs leading-relaxed text-sand selection:bg-tan selection:text-carafe">
                             {post.content}
                           </div>
-
-                          {post.media?.url && (
-                            <div className="relative mt-2 aspect-video max-h-64 w-full overflow-hidden rounded-lg border border-brown/30 bg-carafe">
-                              <Image
-                                src={post.media.url}
-                                alt="Attachment"
-                                fill
-                                className="object-contain"
-                              />
-                            </div>
-                          )}
                         </div>
 
                         {/* Reply Action */}
@@ -474,7 +464,7 @@ export default function ThreadDetailPage() {
           </div>
         )}
 
-        {/* Composer / Reply Editor Section */}
+        {/* Reply Editor */}
         <div ref={replyEditorRef} className="mt-10">
           {!user ? (
             <div className="rounded-2xl border border-brown/30 bg-brown/10 p-8 text-center backdrop-blur-sm">
@@ -512,7 +502,7 @@ export default function ThreadDetailPage() {
                       dispatch(clearReplyToParentId());
                       dispatch(clearActiveQuote());
                     }}
-                    className="text-xs text-tan hover:text-white underline-offset-4 hover:underline"
+                    className="text-xs text-tan underline-offset-4 hover:text-white hover:underline"
                   >
                     Cancel direct reply
                   </button>
@@ -522,14 +512,14 @@ export default function ThreadDetailPage() {
               {/* Active Quote Preview in Editor */}
               {activeQuote && (
                 <div className="relative mt-3 rounded-lg border-l-2 border-tan bg-brown/20 p-3 text-xs italic text-tan">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="not-italic text-[10px] font-bold uppercase text-tan">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase not-italic text-tan">
                       Quoting {activeQuote.authorName}
                     </span>
                     <button
                       type="button"
                       onClick={() => dispatch(clearActiveQuote())}
-                      className="text-tan hover:text-white font-sans text-xs"
+                      className="font-sans text-xs text-tan hover:text-white"
                     >
                       ✕
                     </button>
@@ -538,7 +528,7 @@ export default function ThreadDetailPage() {
                 </div>
               )}
 
-              {/* Reply Body Textarea */}
+              {/* Textarea */}
               <div className="mt-4">
                 <textarea
                   rows={4}
@@ -547,17 +537,6 @@ export default function ThreadDetailPage() {
                   onChange={(e) => setReplyContent(e.target.value)}
                   placeholder="Share your thoughts, advice, or rebuttal..."
                   className="w-full rounded-xl border border-brown/40 bg-carafe/90 p-4 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
-                />
-              </div>
-
-              {/* Image URL Input (Cloudinary) */}
-              <div className="mt-3">
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Paste Cloudinary image URL (optional)..."
-                  className="w-full rounded-lg border border-brown/40 bg-carafe/80 px-3 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
                 />
               </div>
 

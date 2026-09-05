@@ -1,99 +1,77 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../lib/dbConnect";
 import { Thread } from "../../../models/thread";
 import { Post } from "../../../models/post";
 import { Category } from "../../../models/category";
 import { getAuthenticatedUser } from "../../../lib/auth";
 
-/**
- * @swagger
- * /api/threads:
- *   get:
- *     summary: Get paginated threads, optionally filtered by category
- *     tags: [Threads]
- *     parameters:
- *       - in: query
- *         name: categoryId
- *         schema:
- *           type: string
- *         description: MongoDB ObjectId of category
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 20
- *     responses:
- *       200:
- *         description: Paginated threads retrieved successfully
- *       500:
- *         description: Internal server error
- *   post:
- *     summary: Create a new thread along with its opening post
- *     tags: [Threads]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - categoryId
- *               - title
- *               - content
- *             properties:
- *               categoryId:
- *                 type: string
- *               title:
- *                 type: string
- *               content:
- *                 type: string
- *               media:
- *                 type: object
- *                 properties:
- *                   url:
- *                     type: string
- *                   publicId:
- *                     type: string
- *     responses:
- *       201:
- *         description: Thread and initial post created successfully
- *       400:
- *         description: Missing required fields
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Internal server error
- */
+// Helper: Slug generator
+function generateSlug(title) {
+  const base = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+  return `${base}-${Date.now().toString().slice(-4)}`;
+}
+
+// Helper: Media sanitizer (Thread-only)
+function sanitizeMedia(media) {
+  if (
+    media?.url &&
+    typeof media.url === "string" &&
+    media.url.startsWith("https://res.cloudinary.com/")
+  ) {
+    return {
+      url: media.url,
+      publicId: typeof media.publicId === "string" ? media.publicId : null,
+    };
+  }
+  return null;
+}
+
 export async function GET(request) {
   try {
     await dbConnect();
+
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get("categoryId");
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "20", 10);
+
+    // Clamp pagination to safe boundaries
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const skip = (page - 1) * limit;
 
-    const filter = categoryId ? { categoryId } : {};
+    const filter = {};
+    if (categoryId) {
+      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+        return NextResponse.json(
+          { detail: "Invalid category ID format." },
+          { status: 400 }
+        );
+      }
+      filter.categoryId = categoryId;
+    }
 
-    const threads = await Thread.find(filter)
-      .sort({ isPinned: -1, "latestPost.createdAt": -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    const total = await Thread.countDocuments(filter);
+    const [threads, total] = await Promise.all([
+      Thread.find(filter)
+        .sort({ isPinned: -1, "latestPost.createdAt": -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Thread.countDocuments(filter),
+    ]);
 
     return NextResponse.json({
       success: true,
       data: threads,
-      pagination: { total, page, pages: Math.ceil(total / limit) },
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
     });
   } catch (error) {
     return NextResponse.json(
@@ -104,6 +82,9 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  let createdThreadId = null;
+  let createdPostId = null;
+
   try {
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {
@@ -117,10 +98,26 @@ export async function POST(request) {
     const body = await request.json();
     const { categoryId, title, content, media } = body;
 
-    if (!categoryId || !title || !content) {
+    // Validate incoming fields
+    if (!categoryId || !title?.trim() || !content?.trim()) {
       return NextResponse.json(
-        { detail: "Category ID, title, and content are required." },
+        { detail: "Category ID, title, and opening content are required." },
         { status: 400 }
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return NextResponse.json(
+        { detail: "Invalid category ID format." },
+        { status: 400 }
+      );
+    }
+
+    const categoryExists = await Category.exists({ _id: categoryId });
+    if (!categoryExists) {
+      return NextResponse.json(
+        { detail: "Specified category does not exist." },
+        { status: 404 }
       );
     }
 
@@ -130,43 +127,54 @@ export async function POST(request) {
       avatarUrl: authUser.avatarUrl || "",
     };
 
-    const slug = title
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
+    // Sanitize Cloudinary payload strictly for Thread
+    const cleanMedia =
+      media?.url &&
+      typeof media.url === "string" &&
+      media.url.startsWith("https://res.cloudinary.com/")
+        ? {
+            url: media.url,
+            publicId: typeof media.publicId === "string" ? media.publicId : null,
+          }
+        : null;
 
-    // 1. Create the Thread document
+    const now = new Date();
+    const threadId = new mongoose.Types.ObjectId();
+    const postId = new mongoose.Types.ObjectId();
+
+    // 1. Create Thread (Single write with pre-computed IDs and media)
     const thread = await Thread.create({
+      _id: threadId,
       categoryId,
-      title,
-      slug: `${slug}-${Date.now().toString().slice(-4)}`,
+      title: title.trim(),
+      slug: generateSlug(title),
       creator,
       replyCount: 0,
+      media: cleanMedia,
+      latestPost: {
+        postId,
+        userId: creator.userId,
+        username: creator.username,
+        avatarUrl: creator.avatarUrl,
+        createdAt: now,
+      },
     });
+    createdThreadId = thread._id;
 
-    // 2. Create the Opening Post document
+    // 2. Create Opening Post (no media attached)
     const initialPost = await Post.create({
+      _id: postId,
       threadId: thread._id,
       author: creator,
-      content,
-      media: media || { url: null, publicId: null },
+      content: content.trim(),
       parentId: null,
       path: ",",
       depth: 0,
+      createdAt: now,
     });
+    createdPostId = initialPost._id;
 
-    // 3. Update Thread with the latest post snapshot
-    thread.latestPost = {
-      postId: initialPost._id,
-      userId: creator.userId,
-      username: creator.username,
-      avatarUrl: creator.avatarUrl,
-      createdAt: initialPost.createdAt,
-    };
-    await thread.save();
-
-    // 4. Update Category counters and lastActivity
+    // 3. Update Category counters & activity pointer
     await Category.findByIdAndUpdate(categoryId, {
       $inc: { threadCount: 1, postCount: 1 },
       $set: {
@@ -175,7 +183,7 @@ export async function POST(request) {
           threadTitle: thread.title,
           userId: creator.userId,
           username: creator.username,
-          updatedAt: new Date(),
+          updatedAt: now,
         },
       },
     });
@@ -185,6 +193,14 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
+    // Manual cleanup to prevent orphan documents on standalone MongoDB
+    if (createdThreadId) {
+      await Thread.findByIdAndDelete(createdThreadId).catch(() => {});
+    }
+    if (createdPostId) {
+      await Post.findByIdAndDelete(createdPostId).catch(() => {});
+    }
+
     return NextResponse.json(
       { detail: error.message || "Failed to create thread." },
       { status: 500 }

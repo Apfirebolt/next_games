@@ -15,7 +15,8 @@ const ThreadSchema = new mongoose.Schema({
   slug: { 
     type: String, 
     required: true, 
-    lowercase: true 
+    lowercase: true,
+    trim: true 
   },
   
   // Author
@@ -23,6 +24,12 @@ const ThreadSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     username: { type: String, required: true },
     avatarUrl: { type: String, default: '' }
+  },
+
+  // Thread Cover / Header Image
+  media: {
+    url: { type: String, default: null },
+    publicId: { type: String, default: null },
   },
 
   // Metadata flags
@@ -41,7 +48,6 @@ const ThreadSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Compound index for category thread listing sorted by latest activity
 ThreadSchema.index({ categoryId: 1, 'latestPost.createdAt': -1 });
 ThreadSchema.index({ categoryId: 1, isPinned: -1, 'latestPost.createdAt': -1 });
 
