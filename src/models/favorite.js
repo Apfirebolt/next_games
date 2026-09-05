@@ -1,5 +1,31 @@
 import mongoose from "mongoose";
 
+const reviewSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      trim: true,
+      maxlength: [120, "Review title cannot exceed 120 characters"],
+      default: "",
+    },
+    content: {
+      type: String,
+      trim: true,
+      default: "", // Stores raw Markdown string
+    },
+    rating: {
+      type: Number,
+      min: [1, "Rating must be at least 1"],
+      max: [10, "Rating cannot exceed 10"],
+      default: null,
+    },
+  },
+  {
+    timestamps: true,
+    _id: false,
+  }
+);
+
 const favoriteSchema = new mongoose.Schema(
   {
     user: {
@@ -55,6 +81,11 @@ const favoriteSchema = new mongoose.Schema(
     release_date: {
       type: String,
       default: "",
+    },
+    // added new review field
+    review: {
+      type: reviewSchema,
+      default: null,
     },
   },
   {

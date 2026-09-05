@@ -1,4 +1,3 @@
-// src/lib/authOptions.js
 import GoogleProvider from "next-auth/providers/google";
 import dbConnect from "./dbConnect";
 import User from "../models/user";
