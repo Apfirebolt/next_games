@@ -5,6 +5,7 @@ import favoriteReducer from './features/favorites/favoriteSlice'
 import userReducer from './features/user/userSlice'
 import recommendationReducer from './features/recommendations/recommendationSlice'
 import categoryReducer from './features/categories/categorySlice'
+import threadReducer from './features/threads/threadSlice'
 
 export const makeStore = (preloadedState = {}) => {
   return configureStore({
@@ -15,6 +16,7 @@ export const makeStore = (preloadedState = {}) => {
       user: userReducer,
       recommendations: recommendationReducer,
       categories: categoryReducer,
+      threads: threadReducer,
     },
     preloadedState,
   });
