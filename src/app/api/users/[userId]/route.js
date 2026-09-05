@@ -78,7 +78,7 @@ import { getAuthenticatedUser } from "../../../../lib/auth";
 export async function GET(request, { params }) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { userId } = await params;
 
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {
@@ -88,15 +88,9 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Optional safety: restrict viewing only to the user themselves or an admin
-    if (authUser._id.toString() !== id && !authUser.isAdmin) {
-      return NextResponse.json(
-        { detail: "Forbidden: You cannot access this profile." },
-        { status: 403 }
-      );
-    }
+    console.log('ID is ', userId)
 
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(userId).select("-password");
     if (!user) {
       return NextResponse.json(
         { detail: "User not found." },
@@ -127,7 +121,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { userId } = await params;
 
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {

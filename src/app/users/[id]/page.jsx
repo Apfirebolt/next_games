@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -8,12 +8,183 @@ import { useSelector, useDispatch } from "react-redux";
 import Header from "../../../components/Header";
 import Footer from "../../../components/Footer";
 import { fetchUserById, clearSelectedUser } from "../../../features/user/userSlice";
+import {
+  fetchFriends,
+  fetchIncomingRequests,
+  fetchOutgoingRequests,
+  sendFriendRequest,
+  respondToFriendRequest,
+  deleteFriendship,
+} from "../../../features/friends/friendSlice";
 
-export default function UserDetailPage({ params }) {
-  
-  const { id } = useParams();  
+// --- Friend Action Button Sub-Component ---
+function FriendActionButton({ targetUserId, isSelf, currentUserId }) {
   const dispatch = useDispatch();
+  const { friends, incomingRequests, outgoingRequests, isActionLoading } = useSelector(
+    (state) => state.friends || { friends: [], incomingRequests: [], outgoingRequests: [], isActionLoading: false }
+  );
+
+  const [confirmUnfriend, setConfirmUnfriend] = useState(false);
+
+  // Compute relationship state with target user
+  const relationship = useMemo(() => {
+    if (!targetUserId || isSelf) return null;
+
+    // Check if already friends
+    const existingFriend = friends.find((f) => {
+      const friendId = f.friend?._id || f.friend?.id || f.friend;
+      return friendId?.toString() === targetUserId?.toString();
+    });
+    if (existingFriend) {
+      return { type: "friends", friendshipId: existingFriend.friendshipId };
+    }
+
+    // Check if they sent us a request
+    const incoming = incomingRequests.find((req) => {
+      const requesterId = req.requester?._id || req.requester?.id || req.requester;
+      return requesterId?.toString() === targetUserId?.toString();
+    });
+    if (incoming) {
+      return { type: "incoming", friendshipId: incoming._id };
+    }
+
+    // Check if we sent them a request
+    const outgoing = outgoingRequests.find((req) => {
+      const recipientId = req.recipient?._id || req.recipient?.id || req.recipient;
+      return recipientId?.toString() === targetUserId?.toString();
+    });
+    if (outgoing) {
+      return { type: "outgoing", friendshipId: outgoing._id };
+    }
+
+    return { type: "none" };
+  }, [friends, incomingRequests, outgoingRequests, targetUserId, isSelf]);
+
+  if (isSelf || !currentUserId || !relationship) {
+    return null;
+  }
+
+  const handleSend = () => {
+    dispatch(sendFriendRequest(targetUserId)).then(() => {
+      dispatch(fetchOutgoingRequests());
+    });
+  };
+
+  const handleResponse = (action) => {
+    if (!relationship.friendshipId) return;
+    dispatch(respondToFriendRequest({ friendshipId: relationship.friendshipId, action })).then(() => {
+      dispatch(fetchFriends());
+      dispatch(fetchIncomingRequests());
+    });
+  };
+
+  const handleCancelOrRemove = () => {
+    if (!relationship.friendshipId) return;
+    dispatch(deleteFriendship(relationship.friendshipId)).then(() => {
+      setConfirmUnfriend(false);
+      dispatch(fetchFriends());
+      dispatch(fetchOutgoingRequests());
+    });
+  };
+
+  // Case 1: Active Friends
+  if (relationship.type === "friends") {
+    return (
+      <div className="relative">
+        {confirmUnfriend ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCancelOrRemove}
+              disabled={isActionLoading}
+              className="rounded-lg bg-red-600/90 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+            >
+              Confirm Unfriend
+            </button>
+            <button
+              onClick={() => setConfirmUnfriend(false)}
+              className="rounded-lg bg-brown/40 px-2.5 py-1.5 text-xs font-semibold text-sand transition hover:bg-brown/60"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmUnfriend(true)}
+            disabled={isActionLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3.5 py-2 text-xs font-bold text-emerald-400 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            Friends
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Case 2: Incoming Friend Request from Target User
+  if (relationship.type === "incoming") {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => handleResponse("accept")}
+          disabled={isActionLoading}
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-md transition hover:bg-emerald-500 disabled:opacity-50"
+        >
+          Accept Request
+        </button>
+        <button
+          onClick={() => handleResponse("reject")}
+          disabled={isActionLoading}
+          className="rounded-lg border border-brown/40 bg-brown/20 px-3 py-2 text-xs font-bold text-tan transition hover:bg-brown/40 hover:text-white disabled:opacity-50"
+        >
+          Decline
+        </button>
+      </div>
+    );
+  }
+
+  // Case 3: Outgoing Friend Request Sent
+  if (relationship.type === "outgoing") {
+    return (
+      <button
+        onClick={handleCancelOrRemove}
+        disabled={isActionLoading}
+        title="Click to cancel pending request"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-tan/30 bg-tan/10 px-3.5 py-2 text-xs font-semibold text-tan transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+      >
+        <svg className="h-4 w-4 animate-spin-slow" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Request Sent (Cancel)
+      </button>
+    );
+  }
+
+  // Case 4: Default - No Connection
+  return (
+    <button
+      onClick={handleSend}
+      disabled={isActionLoading}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-tan px-4 py-2 text-xs font-bold text-carafe shadow-md transition hover:bg-white hover:shadow-lg disabled:opacity-50"
+    >
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v6m3-3h-6m-1.5-4.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" />
+      </svg>
+      Add Friend
+    </button>
+  );
+}
+
+// --- Main Page Component ---
+export default function UserDetailPage() {
+  const { id } = useParams();
+  const dispatch = useDispatch();
+
   const currentUser = useSelector((state) => state.auth?.user);
+  const currentUserId = currentUser?._id || currentUser?.id;
+
   const { selectedUser, isLoading, isError } = useSelector(
     (state) => state.user || { selectedUser: null, isLoading: true, isError: false }
   );
@@ -21,18 +192,24 @@ export default function UserDetailPage({ params }) {
   const [userFavorites, setUserFavorites] = useState([]);
   const [loadingFavs, setLoadingFavs] = useState(true);
 
-  // 2. Fetch target user by id
+  // 1. Fetch user data and relationship lists on mount
   useEffect(() => {
     if (id && id !== "undefined") {
       dispatch(fetchUserById(id));
     }
 
+    if (currentUserId) {
+      dispatch(fetchFriends());
+      dispatch(fetchIncomingRequests());
+      dispatch(fetchOutgoingRequests());
+    }
+
     return () => {
       dispatch(clearSelectedUser());
     };
-  }, [id, dispatch]);
+  }, [id, currentUserId, dispatch]);
 
-  // 3. Fetch public favorites curated by this user
+  // 2. Fetch public favorites curated by this user
   useEffect(() => {
     const loadUserFavorites = async () => {
       if (!id || id === "undefined") return;
@@ -46,7 +223,7 @@ export default function UserDetailPage({ params }) {
         } else {
           setUserFavorites([]);
         }
-      } catch (err) {
+      } catch {
         setUserFavorites([]);
       } finally {
         setLoadingFavs(false);
@@ -56,10 +233,10 @@ export default function UserDetailPage({ params }) {
     loadUserFavorites();
   }, [id]);
 
+  const targetUserId = selectedUser?._id || selectedUser?.id || id;
   const isSelf =
     currentUser &&
-    (currentUser._id === id ||
-      currentUser.id === id ||
+    (currentUserId === targetUserId ||
       currentUser.username === selectedUser?.username);
 
   const showGameImage = (imgSrc) => {
@@ -80,19 +257,13 @@ export default function UserDetailPage({ params }) {
       <Header />
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
-        {/* Breadcrumb Navigation */}
-        <div className="mb-6">
+        {/* Breadcrumbs */}
+        <div className="mb-6 flex items-center justify-between">
           <Link
             href="/leaderboard"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-tan transition-colors hover:text-white"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="2"
-              stroke="currentColor"
-            >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
             Back to Leaderboard
@@ -102,7 +273,7 @@ export default function UserDetailPage({ params }) {
         {/* Loading Skeleton */}
         {isLoading ? (
           <div className="space-y-6">
-            <div className="h-52 animate-pulse rounded-2xl border border-brown/20 bg-brown/10" />
+            <div className="h-48 animate-pulse rounded-2xl border border-brown/20 bg-brown/10" />
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-72 animate-pulse rounded-xl bg-brown/15" />
@@ -110,7 +281,7 @@ export default function UserDetailPage({ params }) {
             </div>
           </div>
         ) : isError || !selectedUser ? (
-          /* Error / 404 View */
+          /* Profile Not Found */
           <div className="my-auto flex flex-col items-center justify-center py-24 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brown/40 bg-brown/20 text-tan">
               <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -135,9 +306,18 @@ export default function UserDetailPage({ params }) {
             <div className="relative overflow-hidden rounded-2xl border border-brown/30 bg-brown/10 p-6 backdrop-blur-sm sm:p-8">
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-5">
-                  {/* Avatar Letter */}
-                  <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-tan/40 bg-carafe text-2xl font-extrabold uppercase text-tan shadow-xl">
-                    {selectedUser.username ? selectedUser.username.charAt(0) : "P"}
+                  {/* Avatar: Image or Letter Fallback */}
+                  <div className="relative flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-tan/40 bg-carafe text-2xl font-extrabold uppercase text-tan shadow-xl">
+                    {selectedUser.image ? (
+                      <Image
+                        src={selectedUser.image}
+                        alt={selectedUser.username}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      selectedUser.username?.charAt(0) || "P"
+                    )}
                   </div>
 
                   <div>
@@ -177,15 +357,23 @@ export default function UserDetailPage({ params }) {
                   </div>
                 </div>
 
-                {/* Vault Count Stat */}
-                <div className="flex items-center gap-4 rounded-xl border border-brown/30 bg-carafe/80 p-4 sm:self-center">
-                  <div className="px-2 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-tan">
-                      Vault Collection
-                    </p>
-                    <p className="mt-0.5 text-2xl font-extrabold text-white">
-                      {userFavorites.length}
-                    </p>
+                {/* Vault Count & Relationship Actions */}
+                <div className="flex flex-wrap items-center gap-4">
+                  <FriendActionButton
+                    targetUserId={targetUserId}
+                    isSelf={isSelf}
+                    currentUserId={currentUserId}
+                  />
+
+                  <div className="flex items-center rounded-xl border border-brown/30 bg-carafe/80 p-4">
+                    <div className="px-2 text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-tan">
+                        Vault Collection
+                      </p>
+                      <p className="mt-0.5 text-2xl font-extrabold text-white">
+                        {userFavorites.length}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
