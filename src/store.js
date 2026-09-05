@@ -10,6 +10,7 @@ import postReducer from './features/posts/postSlice'
 import friendReducer from './features/friends/friendSlice'
 import conversationReducer from './features/conversations/conversationSlice'
 import moderatorReducer from './features/moderators/moderatorSlice'
+import notificationReducer from './features/notifications/notificationSlice'
 
 
 export const makeStore = (preloadedState = {}) => {
@@ -26,6 +27,7 @@ export const makeStore = (preloadedState = {}) => {
       friends: friendReducer,
       conversations: conversationReducer,
       moderators: moderatorReducer,
+      notifications: notificationReducer,
     },
     preloadedState,
   });
