@@ -18,16 +18,20 @@ import {
 import "@uiw/react-md-editor/markdown-editor.css";
 import "@uiw/react-markdown-preview/markdown.css";
 
-// Dynamically import MDEditor components with SSR disabled to prevent hydration mismatch
+// Dynamically import MDEditor components with SSR disabled
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 const MarkdownViewer = dynamic(
   () => import("@uiw/react-md-editor").then((mod) => mod.default.Markdown),
   { ssr: false }
 );
 
+// Dynamically import EmojiPicker to avoid SSR window errors
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
+
 export default function MessagesPage() {
   const dispatch = useDispatch();
   const messagesEndRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   const currentUser = useSelector((state) => state.auth?.user);
   const currentUserId = currentUser?._id || currentUser?.id;
@@ -53,8 +57,8 @@ export default function MessagesPage() {
 
   const [inboxSearch, setInboxSearch] = useState("");
   const [content, setContent] = useState("");
-  // 'edit' or 'preview' (UIW expects 'edit' rather than 'write')
-  const [editorTab, setEditorTab] = useState("edit");
+  const [editorTab, setEditorTab] = useState("edit"); // 'edit' | 'preview'
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   // 1. Initial fetch of conversations on mount
   useEffect(() => {
@@ -81,6 +85,34 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // 4. Click-outside and ESC key dismiss for emoji popup
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(e.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showEmojiPicker]);
+
   // Filter conversations by friend username or name
   const filteredConversations = useMemo(() => {
     const list = Array.isArray(conversations) ? conversations : [];
@@ -100,6 +132,30 @@ export default function MessagesPage() {
     dispatch(setActiveConversation(conv));
     setContent("");
     setEditorTab("edit");
+    setShowEmojiPicker(false);
+  };
+
+  // Insert emoji at cursor position or append to text
+  const handleEmojiClick = (emojiData) => {
+    const textarea = document.querySelector(".w-md-editor-text-input");
+    const emoji = emojiData.emoji;
+
+    if (textarea) {
+      const start = textarea.selectionStart ?? content.length;
+      const end = textarea.selectionEnd ?? content.length;
+      const updated = content.substring(0, start) + emoji + content.substring(end);
+      setContent(updated);
+
+      // Restore cursor position directly after the inserted emoji
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+      }, 0);
+    } else {
+      setContent((prev) => prev + emoji);
+    }
+
+    setShowEmojiPicker(false);
   };
 
   const handleSendMessage = async () => {
@@ -111,6 +167,7 @@ export default function MessagesPage() {
     };
 
     setContent("");
+    setShowEmojiPicker(false);
     await dispatch(sendMessage(payload));
   };
 
@@ -228,7 +285,7 @@ export default function MessagesPage() {
                         </div>
                         <p className="mt-0.5 truncate text-[11px] text-tan/70">
                           {conv.lastMessage?.content
-                            ? conv.lastMessage.content.replace(/[#*`_~>[\]()]/g, "")
+                            ? conv.lastMessage.content.replace(/[#*`_~]/g, "")
                             : "No messages yet"}
                         </p>
                       </div>
@@ -325,7 +382,26 @@ export default function MessagesPage() {
                 </div>
 
                 {/* Markdown Input Composer */}
-                <div className="border-t border-brown/30 bg-carafe/80 p-4">
+                <div className="relative border-t border-brown/30 bg-carafe/80 p-4">
+                  
+                  {/* Floating Emoji Picker Popover */}
+                  {showEmojiPicker && (
+                    <div
+                      ref={emojiPickerRef}
+                      className="absolute bottom-24 right-6 z-50 rounded-2xl border border-brown/40 bg-carafe shadow-2xl overflow-hidden"
+                    >
+                      <EmojiPicker
+                        onEmojiClick={handleEmojiClick}
+                        theme="dark"
+                        lazyLoadEmojis={true}
+                        searchPlaceHolder="Search emojis..."
+                        previewConfig={{ showPreview: false }}
+                        width={320}
+                        height={380}
+                      />
+                    </div>
+                  )}
+
                   <div
                     className="relative rounded-xl border border-brown/40 bg-carafe focus-within:border-tan overflow-hidden"
                     data-color-mode="dark"
@@ -347,7 +423,7 @@ export default function MessagesPage() {
 
                     {/* Editor Control Toolbar */}
                     <div className="flex items-center justify-between border-t border-brown/20 bg-brown/10 px-3 py-2">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setEditorTab("edit")}
@@ -370,7 +446,22 @@ export default function MessagesPage() {
                         >
                           Preview
                         </button>
-                        <span className="hidden text-[10px] text-tan/50 md:inline ml-3">
+
+                        {/* Emoji Picker Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={() => setShowEmojiPicker((prev) => !prev)}
+                          title="Insert Emoji"
+                          className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition ${
+                            showEmojiPicker
+                              ? "bg-brown/50 text-white"
+                              : "text-tan/70 hover:bg-brown/30 hover:text-white"
+                          }`}
+                        >
+                          <span>😊</span>
+                        </button>
+
+                        <span className="hidden text-[10px] text-tan/50 md:inline ml-2">
                           Tip: <kbd className="rounded bg-brown/30 px-1 font-mono">Cmd/Ctrl + Enter</kbd> to send
                         </span>
                       </div>
@@ -403,7 +494,7 @@ export default function MessagesPage() {
                 </div>
               </>
             ) : (
-              /* Empty Conversation Placeholder */
+              /* Empty State */
               <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brown/40 bg-brown/20 text-tan">
                   <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
