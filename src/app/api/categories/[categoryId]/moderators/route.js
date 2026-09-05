@@ -1,9 +1,33 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../../../lib/dbConnect";
 import CategoryModerator from "../../../../../models/categoryModerator";
 import Category from "../../../../../models/category";
 import User from "../../../../../models/user";
 import { getAuthenticatedUser } from "../../../../../lib/auth";
+
+const USER_PROJECTION = "firstName lastName username email image";
+const ASSIGNED_BY_PROJECTION = "firstName lastName username";
+
+const DEFAULT_PERMISSIONS = {
+  canPinThreads: true,
+  canLockThreads: true,
+  canDeleteThreads: true,
+  canMoveThreads: false,
+  canEditPosts: false,
+  canDeletePosts: true,
+};
+
+function formatPermissions(customPermissions = {}) {
+  const formatted = {};
+  for (const [key, defaultValue] of Object.entries(DEFAULT_PERMISSIONS)) {
+    formatted[key] =
+      typeof customPermissions[key] === "boolean"
+        ? customPermissions[key]
+        : defaultValue;
+  }
+  return formatted;
+}
 
 /**
  * @swagger
@@ -22,6 +46,8 @@ import { getAuthenticatedUser } from "../../../../../lib/auth";
  *     responses:
  *       200:
  *         description: List of category moderators returned successfully
+ *       400:
+ *         description: Invalid category ID format
  *       401:
  *         description: Unauthorized
  *       404:
@@ -69,7 +95,7 @@ import { getAuthenticatedUser } from "../../../../../lib/auth";
  *       201:
  *         description: Moderator assigned successfully
  *       400:
- *         description: User is already a moderator of this category or missing fields
+ *         description: User is already a moderator of this category or invalid ID
  *       401:
  *         description: Unauthorized
  *       403:
@@ -93,7 +119,14 @@ export async function GET(request, { params }) {
 
     const { categoryId } = await params;
 
-    const categoryExists = await Category.findById(categoryId).lean();
+    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+      return NextResponse.json(
+        { detail: "Invalid category ID format." },
+        { status: 400 }
+      );
+    }
+
+    const categoryExists = await Category.exists({ _id: categoryId });
     if (!categoryExists) {
       return NextResponse.json(
         { detail: "Category not found." },
@@ -102,8 +135,8 @@ export async function GET(request, { params }) {
     }
 
     const moderators = await CategoryModerator.find({ categoryId })
-      .populate("userId", "firstName lastName username email image")
-      .populate("assignedBy", "firstName lastName username")
+      .populate("userId", USER_PROJECTION)
+      .populate("assignedBy", ASSIGNED_BY_PROJECTION)
       .sort({ createdAt: -1 })
       .lean();
 
@@ -128,7 +161,6 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Admin authorization guard
     if (!user.isAdmin) {
       return NextResponse.json(
         { detail: "Forbidden. Admin privileges required to assign moderators." },
@@ -138,7 +170,7 @@ export async function POST(request, { params }) {
 
     const { categoryId } = await params;
     const body = await request.json();
-    const { userId, permissions = {} } = body;
+    const { userId, permissions } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -147,8 +179,22 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Verify category existence
-    const category = await Category.findById(categoryId);
+    if (
+      !mongoose.Types.ObjectId.isValid(categoryId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return NextResponse.json(
+        { detail: "Invalid categoryId or userId format." },
+        { status: 400 }
+      );
+    }
+
+    // Parallel validation for target entities
+    const [category, targetUser] = await Promise.all([
+      Category.findById(categoryId).select("_id title").lean(),
+      User.findById(userId).select("_id username").lean(),
+    ]);
+
     if (!category) {
       return NextResponse.json(
         { detail: "Category not found." },
@@ -156,8 +202,6 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Verify target user existence
-    const targetUser = await User.findById(userId);
     if (!targetUser) {
       return NextResponse.json(
         { detail: "User to be assigned as moderator was not found." },
@@ -165,8 +209,8 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Check if user is already assigned to this category
-    const existing = await CategoryModerator.findOne({ categoryId, userId });
+    // Check if user is already assigned
+    const existing = await CategoryModerator.findOne({ categoryId, userId }).lean();
     if (existing) {
       return NextResponse.json(
         { detail: `@${targetUser.username} is already a moderator for this category.` },
@@ -174,24 +218,19 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Create assignment
-    const moderator = await CategoryModerator.create({
-      categoryId,
-      userId,
-      assignedBy: user._id,
-      permissions: {
-        canPinThreads: permissions.canPinThreads ?? true,
-        canLockThreads: permissions.canLockThreads ?? true,
-        canDeleteThreads: permissions.canDeleteThreads ?? true,
-        canMoveThreads: permissions.canMoveThreads ?? false,
-        canEditPosts: permissions.canEditPosts ?? false,
-        canDeletePosts: permissions.canDeletePosts ?? true,
+    // Create record
+    const [moderator] = await CategoryModerator.create([
+      {
+        categoryId,
+        userId,
+        assignedBy: user._id,
+        permissions: formatPermissions(permissions),
       },
-    });
+    ]);
 
     const populated = await CategoryModerator.findById(moderator._id)
-      .populate("userId", "firstName lastName username email image")
-      .populate("assignedBy", "firstName lastName username")
+      .populate("userId", USER_PROJECTION)
+      .populate("assignedBy", ASSIGNED_BY_PROJECTION)
       .lean();
 
     return NextResponse.json(
@@ -202,6 +241,14 @@ export async function POST(request, { params }) {
       { status: 201 }
     );
   } catch (error) {
+    // Catch compound unique index collision if simultaneous requests hit the route
+    if (error.code === 11000) {
+      return NextResponse.json(
+        { detail: "This user is already a moderator for this category." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { detail: error.message || "Failed to assign category moderator." },
       { status: 500 }
