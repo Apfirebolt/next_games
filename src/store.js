@@ -4,6 +4,7 @@ import authReducer from './features/auth/authSlice'
 import favoriteReducer from './features/favorites/favoriteSlice'
 import userReducer from './features/user/userSlice'
 import recommendationReducer from './features/recommendations/recommendationSlice'
+import categoryReducer from './features/categories/categorySlice'
 
 export const makeStore = (preloadedState = {}) => {
   return configureStore({
@@ -13,6 +14,7 @@ export const makeStore = (preloadedState = {}) => {
       favorites: favoriteReducer,
       user: userReducer,
       recommendations: recommendationReducer,
+      categories: categoryReducer,
     },
     preloadedState,
   });
