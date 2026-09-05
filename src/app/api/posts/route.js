@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import dbConnect from "../../../lib/dbConnect";
-import { Post } from "../../../models/Post";
-import { Thread } from "../../../models/Thread";
-import { Category } from "../../../models/Category";
+import { Post } from "../../../models/post";
+import { Thread } from "../../../models/thread";
+import { Category } from "../../../models/category";
 import { getAuthenticatedUser } from "../../../lib/auth";
 
 /**
@@ -93,28 +92,33 @@ export async function GET(request) {
     const mode = searchParams.get("mode") || "tree";
 
     if (!threadId) {
-      return NextResponse.json({ detail: "threadId query parameter is required." }, { status: 400 });
+      return NextResponse.json(
+        { detail: "threadId query parameter is required." },
+        { status: 400 }
+      );
     }
 
-    const sortQuery = mode === "tree" ? { path: 1, createdAt: 1 } : { createdAt: 1 };
+    const sortQuery =
+      mode === "tree" ? { path: 1, createdAt: 1 } : { createdAt: 1 };
     const posts = await Post.find({ threadId }).sort(sortQuery).lean();
 
     return NextResponse.json({ success: true, data: posts });
   } catch (error) {
-    return NextResponse.json({ detail: error.message || "Failed to fetch posts." }, { status: 500 });
+    return NextResponse.json(
+      { detail: error.message || "Failed to fetch posts." },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "Unauthorized access, please login again." }, { status: 401 });
+      return NextResponse.json(
+        { detail: "Unauthorized access, please login again." },
+        { status: 401 }
+      );
     }
 
     await dbConnect();
@@ -122,41 +126,50 @@ export async function POST(request) {
     const { threadId, content, media, quote, parentId } = body;
 
     if (!threadId || !content) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "Thread ID and content are required." }, { status: 400 });
+      return NextResponse.json(
+        { detail: "Thread ID and content are required." },
+        { status: 400 }
+      );
     }
 
-    const thread = await Thread.findById(threadId).session(session);
+    const thread = await Thread.findById(threadId);
     if (!thread) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "Thread not found." }, { status: 404 });
+      return NextResponse.json(
+        { detail: "Thread not found." },
+        { status: 404 }
+      );
     }
 
     if (thread.isLocked) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "This thread is locked." }, { status: 403 });
+      return NextResponse.json(
+        { detail: "This thread is locked." },
+        { status: 403 }
+      );
     }
 
     const author = {
       userId: authUser._id,
       username: authUser.username || authUser.name || "User",
-      avatarUrl: authUser.avatarUrl || ""
+      avatarUrl: authUser.avatarUrl || "",
     };
 
+    // 1. Create and save the new post (triggers pre-save path calculation)
     const newPost = new Post({
       threadId,
       author,
       content,
       media: media || { url: null, publicId: null },
-      quote: quote || { originalPostId: null, authorName: null, selectedText: null },
-      parentId: parentId || null
+      quote: quote || {
+        originalPostId: null,
+        authorName: null,
+        selectedText: null,
+      },
+      parentId: parentId || null,
     });
 
-    await newPost.save({ session });
+    await newPost.save();
 
+    // 2. Atomically update Thread reply counter and latestPost snapshot
     await Thread.findByIdAndUpdate(threadId, {
       $inc: { replyCount: 1 },
       $set: {
@@ -165,11 +178,12 @@ export async function POST(request) {
           userId: author.userId,
           username: author.username,
           avatarUrl: author.avatarUrl,
-          createdAt: newPost.createdAt
-        }
-      }
-    }, { session });
+          createdAt: newPost.createdAt,
+        },
+      },
+    });
 
+    // 3. Atomically update Category post counter and lastActivity
     await Category.findByIdAndUpdate(thread.categoryId, {
       $inc: { postCount: 1 },
       $set: {
@@ -178,18 +192,19 @@ export async function POST(request) {
           threadTitle: thread.title,
           userId: author.userId,
           username: author.username,
-          updatedAt: new Date()
-        }
-      }
-    }, { session });
+          updatedAt: new Date(),
+        },
+      },
+    });
 
-    await session.commitTransaction();
-    session.endSession();
-
-    return NextResponse.json({ success: true, data: newPost }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: newPost },
+      { status: 201 }
+    );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    return NextResponse.json({ detail: error.message || "Failed to post reply." }, { status: 500 });
+    return NextResponse.json(
+      { detail: error.message || "Failed to post reply." },
+      { status: 500 }
+    );
   }
 }

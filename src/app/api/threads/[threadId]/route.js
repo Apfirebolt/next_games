@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "../../../../lib/dbConnect";
-import { Thread } from "../../../../models/Thread";
+import { Thread } from "../../../../models/thread";
 
 /**
  * @swagger
@@ -26,7 +26,7 @@ import { Thread } from "../../../../models/Thread";
 export async function GET(request, { params }) {
   try {
     await dbConnect();
-    const { threadId } = params;
+    const { threadId } = await params;
 
     const thread = await Thread.findByIdAndUpdate(
       threadId,

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 import dbConnect from "../../../lib/dbConnect";
 import { Thread } from "../../../models/thread";
 import { Post } from "../../../models/post";
@@ -94,23 +93,24 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: threads,
-      pagination: { total, page, pages: Math.ceil(total / limit) }
+      pagination: { total, page, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
-    return NextResponse.json({ detail: error.message || "Failed to fetch threads." }, { status: 500 });
+    return NextResponse.json(
+      { detail: error.message || "Failed to fetch threads." },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const authUser = await getAuthenticatedUser(request);
     if (!authUser) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "Unauthorized access, please login again." }, { status: 401 });
+      return NextResponse.json(
+        { detail: "Unauthorized access, please login again." },
+        { status: 401 }
+      );
     }
 
     await dbConnect();
@@ -118,46 +118,55 @@ export async function POST(request) {
     const { categoryId, title, content, media } = body;
 
     if (!categoryId || !title || !content) {
-      await session.abortTransaction();
-      session.endSession();
-      return NextResponse.json({ detail: "Category ID, title, and content are required." }, { status: 400 });
+      return NextResponse.json(
+        { detail: "Category ID, title, and content are required." },
+        { status: 400 }
+      );
     }
 
     const creator = {
       userId: authUser._id,
       username: authUser.username || authUser.name || "User",
-      avatarUrl: authUser.avatarUrl || ""
+      avatarUrl: authUser.avatarUrl || "",
     };
 
-    const slug = title.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+    const slug = title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
 
-    const [thread] = await Thread.create([{
+    // 1. Create the Thread document
+    const thread = await Thread.create({
       categoryId,
       title,
       slug: `${slug}-${Date.now().toString().slice(-4)}`,
       creator,
-      replyCount: 0
-    }], { session });
+      replyCount: 0,
+    });
 
-    const [initialPost] = await Post.create([{
+    // 2. Create the Opening Post document
+    const initialPost = await Post.create({
       threadId: thread._id,
       author: creator,
       content,
       media: media || { url: null, publicId: null },
       parentId: null,
       path: ",",
-      depth: 0
-    }], { session });
+      depth: 0,
+    });
 
+    // 3. Update Thread with the latest post snapshot
     thread.latestPost = {
       postId: initialPost._id,
       userId: creator.userId,
       username: creator.username,
       avatarUrl: creator.avatarUrl,
-      createdAt: initialPost.createdAt
+      createdAt: initialPost.createdAt,
     };
-    await thread.save({ session });
+    await thread.save();
 
+    // 4. Update Category counters and lastActivity
     await Category.findByIdAndUpdate(categoryId, {
       $inc: { threadCount: 1, postCount: 1 },
       $set: {
@@ -166,18 +175,19 @@ export async function POST(request) {
           threadTitle: thread.title,
           userId: creator.userId,
           username: creator.username,
-          updatedAt: new Date()
-        }
-      }
-    }, { session });
+          updatedAt: new Date(),
+        },
+      },
+    });
 
-    await session.commitTransaction();
-    session.endSession();
-
-    return NextResponse.json({ success: true, data: { thread, post: initialPost } }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: { thread, post: initialPost } },
+      { status: 201 }
+    );
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    return NextResponse.json({ detail: error.message || "Failed to create thread." }, { status: 500 });
+    return NextResponse.json(
+      { detail: error.message || "Failed to create thread." },
+      { status: 500 }
+    );
   }
 }

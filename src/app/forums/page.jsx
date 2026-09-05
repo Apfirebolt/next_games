@@ -10,10 +10,7 @@ import {
   createCategory,
   resetCategoryStatus,
 } from "../../features/categories/categorySlice";
-import {
-  fetchThreads,
-  setViewMode,
-} from "../../features/threads/threadSlice";
+import { fetchThreads, setViewMode } from "../../features/threads/threadSlice";
 
 const EMPTY_ARRAY = [];
 
@@ -22,18 +19,18 @@ export default function ForumsPage() {
 
   const user = useSelector((state) => state.auth?.user);
   const categories = useSelector(
-    (state) => state.categories?.categories ?? EMPTY_ARRAY
+    (state) => state.categories?.categories ?? EMPTY_ARRAY,
   );
   const isCategoriesLoading = useSelector(
-    (state) => state.categories?.isLoading ?? false
+    (state) => state.categories?.isLoading ?? false,
   );
   const isCreateLoading = useSelector(
-    (state) => state.categories?.isCreateLoading ?? false
+    (state) => state.categories?.isCreateLoading ?? false,
   );
 
   const threads = useSelector((state) => state.threads?.threads ?? EMPTY_ARRAY);
   const isThreadsLoading = useSelector(
-    (state) => state.threads?.isLoading ?? false
+    (state) => state.threads?.isLoading ?? false,
   );
   const viewMode = useSelector((state) => state.threads?.viewMode ?? "table");
 
@@ -85,7 +82,7 @@ export default function ForumsPage() {
 
       const categoryThreads = threadsByCategory[category._id] || [];
       const hasMatchingThread = categoryThreads.some((thread) =>
-        thread.title.toLowerCase().includes(searchQuery.toLowerCase())
+        thread.title.toLowerCase().includes(searchQuery.toLowerCase()),
       );
 
       return matchesTab && (categoryMatchesSearch || hasMatchingThread);
@@ -93,7 +90,11 @@ export default function ForumsPage() {
   }, [categories, selectedCategoryTab, searchQuery, threadsByCategory]);
 
   const handleOpenCategoryModal = () => {
-    setNewCategoryData({ title: "", description: "", order: categories.length });
+    setNewCategoryData({
+      title: "",
+      description: "",
+      order: categories.length,
+    });
     setIsNewCategoryModalOpen(true);
   };
 
@@ -152,8 +153,10 @@ export default function ForumsPage() {
                 Discussion <span className="text-tan">Forums</span>
               </h1>
               <p className="mt-1 text-sm text-tan">
-                {categories.length} {categories.length === 1 ? "category" : "categories"} with{" "}
-                {threads.length} active {threads.length === 1 ? "thread" : "threads"}.
+                {categories.length}{" "}
+                {categories.length === 1 ? "category" : "categories"} with{" "}
+                {threads.length} active{" "}
+                {threads.length === 1 ? "thread" : "threads"}.
               </p>
             </div>
 
@@ -181,26 +184,6 @@ export default function ForumsPage() {
                   <span>New Category</span>
                 </button>
               )}
-
-              <Link
-                href="/forums/new-thread"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brown px-4 py-2.5 text-xs font-semibold text-sand shadow-sm transition-all hover:bg-brown/80 hover:text-white"
-              >
-                <span>Start a Thread</span>
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="2"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
-                  />
-                </svg>
-              </Link>
             </div>
           </div>
 
@@ -343,9 +326,12 @@ export default function ForumsPage() {
                 />
               </svg>
             </div>
-            <h2 className="mt-4 text-xl font-bold text-white">No Categories Available</h2>
+            <h2 className="mt-4 text-xl font-bold text-white">
+              No Categories Available
+            </h2>
             <p className="mt-1 max-w-sm text-xs text-tan">
-              The community has not established any topic groups yet. Create the initial category to get conversations moving.
+              The community has not established any topic groups yet. Create the
+              initial category to get conversations moving.
             </p>
             {user ? (
               <button
@@ -385,10 +371,14 @@ export default function ForumsPage() {
           /* Category Groups */
           <div className="mt-8 space-y-8">
             {filteredCategories.map((category) => {
-              const categoryThreads = (threadsByCategory[category._id] || []).filter(
+              const categoryThreads = (
+                threadsByCategory[category._id] || []
+              ).filter(
                 (thread) =>
                   !searchQuery ||
-                  thread.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  thread.title
+                    .toLowerCase()
+                    .includes(searchQuery.toLowerCase()),
               );
 
               return (
@@ -397,11 +387,14 @@ export default function ForumsPage() {
                   className="overflow-hidden rounded-2xl border border-brown/30 bg-brown/10 backdrop-blur-sm"
                 >
                   {/* Category Section Header */}
-                  <div className="flex flex-col gap-3 border-b border-brown/30 bg-brown/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <Link
+                    href={`/forums/category/${category._id}`}
+                    className="group flex flex-col gap-3 border-b border-brown/30 bg-brown/20 px-6 py-4 transition-colors hover:bg-brown/30 sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <div>
                       <div className="flex items-center gap-2.5">
-                        <span className="h-2 w-2 rounded-full bg-tan" />
-                        <h2 className="text-lg font-bold text-white">
+                        <span className="h-2 w-2 rounded-full bg-tan transition-transform duration-200 group-hover:scale-125" />
+                        <h2 className="text-lg font-bold text-white transition-colors group-hover:text-tan">
                           {category.title}
                         </h2>
                       </div>
@@ -424,8 +417,11 @@ export default function ForumsPage() {
                           ? "post"
                           : "posts"}
                       </span>
+                      <span className="ml-1 text-sm text-tan/60 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-tan">
+                        →
+                      </span>
                     </div>
-                  </div>
+                  </Link>
 
                   {/* Empty Threads in Category */}
                   {categoryThreads.length === 0 ? (
@@ -449,7 +445,9 @@ export default function ForumsPage() {
                             <th className="px-6 py-3">Topic</th>
                             <th className="px-4 py-3 text-center">Replies</th>
                             <th className="px-4 py-3 text-center">Views</th>
-                            <th className="px-6 py-3 text-right">Latest Activity</th>
+                            <th className="px-6 py-3 text-right">
+                              Latest Activity
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-brown/20">
@@ -475,10 +473,13 @@ export default function ForumsPage() {
                                     <div className="mt-1 flex items-center gap-2 text-[11px] text-tan/70">
                                       <span>Started by</span>
                                       <span className="font-semibold text-tan">
-                                        {thread.creator?.username || "Anonymous"}
+                                        {thread.creator?.username ||
+                                          "Anonymous"}
                                       </span>
                                       <span>•</span>
-                                      <span>{formatDate(thread.createdAt)}</span>
+                                      <span>
+                                        {formatDate(thread.createdAt)}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -667,7 +668,10 @@ export default function ForumsPage() {
               </div>
 
               {/* Modal Body Form */}
-              <form onSubmit={handleCreateCategorySubmit} className="space-y-4 p-6">
+              <form
+                onSubmit={handleCreateCategorySubmit}
+                className="space-y-4 p-6"
+              >
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
                     Category Title *

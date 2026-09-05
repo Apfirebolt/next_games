@@ -9,6 +9,7 @@ import Footer from "../../../../components/Footer";
 import { fetchCategories } from "../../../../features/categories/categorySlice";
 import {
   fetchThreads,
+  createThread,
   setViewMode,
 } from "../../../../features/threads/threadSlice";
 
@@ -20,6 +21,7 @@ export default function CategoryDetailPage() {
   const dispatch = useDispatch();
   const categoryId = params?.id;
 
+  const user = useSelector((state) => state.auth?.user);
   const categories = useSelector(
     (state) => state.categories?.categories ?? EMPTY_ARRAY
   );
@@ -31,10 +33,22 @@ export default function CategoryDetailPage() {
   const isThreadsLoading = useSelector(
     (state) => state.threads?.isLoading ?? false
   );
+  const isCreateLoading = useSelector(
+    (state) => state.threads?.isCreateLoading ?? false
+  );
   const viewMode = useSelector((state) => state.threads?.viewMode ?? "table");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("ALL"); // "ALL" | "PINNED" | "UNANSWERED"
+
+  // Create Thread Modal State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newThreadForm, setNewThreadForm] = useState({
+    title: "",
+    content: "",
+    imageUrl: "",
+    imagePublicId: "",
+  });
 
   useEffect(() => {
     if (!categories.length) {
@@ -45,14 +59,12 @@ export default function CategoryDetailPage() {
     }
   }, [dispatch, categoryId, categories.length]);
 
-  // Resolve active category document by ID or slug
   const currentCategory = useMemo(() => {
     return categories.find(
       (cat) => cat._id === categoryId || cat.slug === categoryId
     );
   }, [categories, categoryId]);
 
-  // Calculate live statistics across all threads in this category
   const stats = useMemo(() => {
     const totalThreads = threads.length;
     const totalReplies = threads.reduce(
@@ -64,7 +76,6 @@ export default function CategoryDetailPage() {
       0
     );
 
-    // Unique participants based on creators and latest posters
     const participants = new Set();
     threads.forEach((t) => {
       if (t.creator?.username) participants.add(t.creator.username);
@@ -83,7 +94,6 @@ export default function CategoryDetailPage() {
     };
   }, [threads]);
 
-  // Filter threads based on search input and filter buttons
   const filteredThreads = useMemo(() => {
     return threads.filter((t) => {
       const matchesSearch =
@@ -102,6 +112,50 @@ export default function CategoryDetailPage() {
       return matchesSearch && matchesFilter;
     });
   }, [threads, searchQuery, filterType]);
+
+  const handleOpenCreateModal = () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    setNewThreadForm({
+      title: "",
+      content: "",
+      imageUrl: "",
+      imagePublicId: "",
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  const handleCreateThreadSubmit = async (e) => {
+    e.preventDefault();
+    if (!newThreadForm.title.trim() || !newThreadForm.content.trim()) return;
+
+    const payload = {
+      categoryId: currentCategory?._id || categoryId,
+      title: newThreadForm.title,
+      content: newThreadForm.content,
+      media: newThreadForm.imageUrl
+        ? {
+            url: newThreadForm.imageUrl,
+            publicId: newThreadForm.imagePublicId || undefined,
+          }
+        : undefined,
+    };
+
+    const result = await dispatch(createThread(payload));
+    if (!result.error) {
+      handleCloseCreateModal();
+      // Optional: automatically route to the newly created thread
+      if (result.payload?.thread?._id) {
+        router.push(`/forums/${result.payload.thread._id}`);
+      }
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "No activity";
@@ -147,8 +201,10 @@ export default function CategoryDetailPage() {
               </p>
             </div>
 
-            <Link
-              href={`/forums/new-thread?categoryId=${currentCategory?._id || categoryId}`}
+            {/* Modal Trigger for New Thread */}
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-tan px-4 py-2.5 text-xs font-bold text-carafe shadow-sm transition-all hover:bg-white sm:self-start"
             >
               <svg
@@ -165,7 +221,7 @@ export default function CategoryDetailPage() {
                 />
               </svg>
               <span>Post New Thread</span>
-            </Link>
+            </button>
           </div>
 
           {/* Statistical Insights Grid */}
@@ -352,12 +408,13 @@ export default function CategoryDetailPage() {
                 ? `No threads match your search "${searchQuery}".`
                 : "No conversations have started in this section yet."}
             </p>
-            <Link
-              href={`/forums/new-thread?categoryId=${currentCategory?._id || categoryId}`}
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
               className="mt-6 rounded-lg bg-tan px-5 py-2.5 text-xs font-bold text-carafe transition-all hover:bg-white"
             >
               Start First Discussion
-            </Link>
+            </button>
           </div>
         ) : viewMode === "table" ? (
           /* Table View */
@@ -520,6 +577,155 @@ export default function CategoryDetailPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Modal: Create New Thread */}
+        {isCreateModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={handleCloseCreateModal}
+          >
+            <div
+              className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-brown/40 bg-carafe shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-brown/30 bg-brown/15 px-6 py-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-tan/30 bg-tan/10 text-tan">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="2"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4.5v15m7.5-7.5h-15"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      Start a New Thread
+                    </h3>
+                    <p className="text-xs text-tan">
+                      Posting in{" "}
+                      <span className="font-semibold text-white">
+                        {currentCategory?.title || "Forum"}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCloseCreateModal}
+                  className="rounded-lg border border-brown/40 p-1.5 text-tan transition-colors hover:bg-brown/30 hover:text-white"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Form Body */}
+              <form
+                onSubmit={handleCreateThreadSubmit}
+                className="flex flex-1 flex-col overflow-y-auto p-6 space-y-4"
+              >
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
+                    Thread Topic / Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newThreadForm.title}
+                    onChange={(e) =>
+                      setNewThreadForm({
+                        ...newThreadForm,
+                        title: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. Recommended poly strings for crisp control?"
+                    className="w-full rounded-lg border border-brown/40 bg-carafe/90 px-3.5 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
+                    Opening Message *
+                  </label>
+                  <textarea
+                    rows={6}
+                    required
+                    value={newThreadForm.content}
+                    onChange={(e) =>
+                      setNewThreadForm({
+                        ...newThreadForm,
+                        content: e.target.value,
+                      })
+                    }
+                    placeholder="Provide details, context, questions, or your initial thoughts..."
+                    className="w-full rounded-xl border border-brown/40 bg-carafe/90 p-3.5 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-tan">
+                    Optional Image URL (Cloudinary)
+                  </label>
+                  <input
+                    type="url"
+                    value={newThreadForm.imageUrl}
+                    onChange={(e) =>
+                      setNewThreadForm({
+                        ...newThreadForm,
+                        imageUrl: e.target.value,
+                      })
+                    }
+                    placeholder="https://res.cloudinary.com/..."
+                    className="w-full rounded-lg border border-brown/40 bg-carafe/90 px-3.5 py-2 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
+                  />
+                </div>
+
+                {/* Modal Footer Controls */}
+                <div className="flex items-center justify-end gap-2.5 border-t border-brown/20 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleCloseCreateModal}
+                    className="rounded-lg border border-brown/40 px-4 py-2 text-xs font-semibold text-sand transition-all hover:bg-brown/20"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      isCreateLoading ||
+                      !newThreadForm.title.trim() ||
+                      !newThreadForm.content.trim()
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-tan px-5 py-2 text-xs font-bold text-carafe shadow-md transition-all hover:bg-white disabled:opacity-50"
+                  >
+                    {isCreateLoading ? "Publishing..." : "Publish Thread"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </main>

@@ -45,4 +45,5 @@ const ThreadSchema = new mongoose.Schema({
 ThreadSchema.index({ categoryId: 1, 'latestPost.createdAt': -1 });
 ThreadSchema.index({ categoryId: 1, isPinned: -1, 'latestPost.createdAt': -1 });
 
-export const Thread = mongoose.model('Thread', ThreadSchema);
+export const Thread = mongoose.models.Thread || mongoose.model('Thread', ThreadSchema);
+export default Thread;

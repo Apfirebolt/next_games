@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 const PostSchema = new mongoose.Schema({
   threadId: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -53,21 +55,22 @@ const PostSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to populate materialized path automatically
-PostSchema.pre('save', async function (next) {
+PostSchema.pre('save', async function () {
   if (this.isNew && this.parentId) {
-    const parent = await mongoose.model('Post').findById(this.parentId).select('path depth');
+    const PostModel = mongoose.models.Post || mongoose.model('Post');
+    const parent = await PostModel.findById(this.parentId).select('path depth');
     if (parent) {
       this.path = `${parent.path}${parent._id},`;
-      this.depth = parent.depth + 1;
+      this.depth = (parent.depth || 0) + 1;
     }
   } else if (this.isNew && !this.parentId) {
     this.path = ',';
     this.depth = 0;
   }
-  next();
 });
 
 // Index to retrieve thread posts in nested tree or chronological order
 PostSchema.index({ threadId: 1, path: 1, createdAt: 1 });
 
-export const Post = mongoose.model('Post', PostSchema);
+export const Post = mongoose.models.Post || mongoose.model('Post', PostSchema);
+export default Post;

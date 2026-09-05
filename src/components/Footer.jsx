@@ -6,6 +6,7 @@ const FOOTER_NAV = [
     links: [
       { label: 'All Games', href: '/games' },
       { label: 'Leaderboard', href: '/leaderboard' },
+      { label: 'Forums', href: '/forums' },
       { label: 'Recommendations', href: '/recommendation' },
       { label: 'About Us', href: '/about' },
       { label: 'News & Updates', href: '/blog' },
