@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import Link from "next/link";
@@ -8,22 +8,54 @@ import { useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { useSession, signOut } from "next-auth/react";
 import { logout, reset } from "../features/auth/authSlice";
+import { fetchIncomingRequests } from "../features/friends/friendSlice";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
+  const menuRef = useRef(null);
   const router = useRouter();
   const dispatch = useDispatch();
 
   const { data: session } = useSession();
   const { user: reduxUser } = useSelector((state) => state.auth || {});
   const favorites = useSelector((state) => state.favorites?.favorites || []);
+  const incomingRequests = useSelector(
+    (state) => state.friends?.incomingRequests || []
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch incoming requests when authenticated to display the badge
+  const user = reduxUser || session?.user;
+  const currentUserId = user?._id || user?.id;
+
+  useEffect(() => {
+    if (currentUserId) {
+      dispatch(fetchIncomingRequests());
+    }
+  }, [dispatch, currentUserId]);
+
+  // Click outside to close the desktop user dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    if (isUserMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -48,8 +80,6 @@ const Header = () => {
     router.push("/login");
   };
 
-  // Combine both sources
-  const user = reduxUser || session?.user;
   const isAuthenticated = mounted && Boolean(user);
   const displayName =
     user?.firstName ||
@@ -58,6 +88,7 @@ const Header = () => {
     user?.email ||
     "Player";
   const userAvatar = user?.image || null;
+  const pendingRequestsCount = incomingRequests.length;
 
   return (
     <header className="sticky top-0 z-50 border-b border-brown/30 bg-carafe/95 backdrop-blur-md transition-all">
@@ -90,7 +121,7 @@ const Header = () => {
           {/* Desktop Auth State Controls */}
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
@@ -110,6 +141,12 @@ const Header = () => {
                     </span>
                   )}
                   <span className="max-w-[110px] truncate">{displayName}</span>
+
+                  {/* Red dot badge if requests are waiting */}
+                  {pendingRequestsCount > 0 && (
+                    <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  )}
+
                   <svg
                     className={`h-3.5 w-3.5 text-tan transition-transform duration-200 ${
                       isUserMenuOpen ? "rotate-180" : ""
@@ -128,7 +165,7 @@ const Header = () => {
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl border border-brown/40 bg-carafe p-1.5 shadow-2xl backdrop-blur-xl">
+                  <div className="absolute right-0 mt-2 w-52 origin-top-right rounded-xl border border-brown/40 bg-carafe p-1.5 shadow-2xl backdrop-blur-xl">
                     <div className="border-b border-brown/30 px-3 py-2 text-[11px] text-tan">
                       Signed in as <br />
                       <span className="font-bold text-sand truncate block">
@@ -136,6 +173,7 @@ const Header = () => {
                       </span>
                     </div>
 
+                    {/* Saved Vault */}
                     <Link
                       href="/favorites"
                       onClick={() => setIsUserMenuOpen(false)}
@@ -154,13 +192,44 @@ const Header = () => {
                           d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"
                         />
                       </svg>
-                      Saved Vault ({favorites?.length || 0})
+                      <span className="flex-1 text-left">Saved Vault</span>
+                      <span className="text-[10px] text-tan/70 font-mono">
+                        ({favorites?.length || 0})
+                      </span>
                     </Link>
 
+                    {/* Friends (directly below Saved Vault) */}
+                    <Link
+                      href="/friends"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
+                    >
+                      <svg
+                        className="h-4 w-4 text-tan"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+                        />
+                      </svg>
+                      <span className="flex-1 text-left">Friends</span>
+                      {pendingRequestsCount > 0 && (
+                        <span className="rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold text-amber-300">
+                          {pendingRequestsCount}
+                        </span>
+                      )}
+                    </Link>
+
+                    {/* Profile Settings */}
                     <Link
                       href="/profile"
                       onClick={() => setIsUserMenuOpen(false)}
-                      className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
                     >
                       <svg
                         className="h-4 w-4 text-tan"
@@ -178,10 +247,11 @@ const Header = () => {
                       Profile Settings
                     </Link>
 
+                    {/* Log Out */}
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-danger transition-colors hover:bg-danger/10"
+                      className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-danger transition-colors hover:bg-danger/10"
                     >
                       <svg
                         className="h-4 w-4 text-danger"
@@ -281,13 +351,34 @@ const Header = () => {
                       Signed in as <strong className="text-white">{displayName}</strong>
                     </span>
                   </div>
+
+                  {/* Saved Vault (Mobile) */}
                   <Link
                     href="/favorites"
                     onClick={() => setIsOpen(false)}
-                    className="block rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
+                    className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
                   >
-                    Saved Vault ({favorites?.length || 0})
+                    <span>Saved Vault</span>
+                    <span className="text-xs text-tan font-mono">
+                      ({favorites?.length || 0})
+                    </span>
                   </Link>
+
+                  {/* Friends (Mobile) */}
+                  <Link
+                    href="/friends"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
+                  >
+                    <span>Friends</span>
+                    {pendingRequestsCount > 0 && (
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
+                        {pendingRequestsCount} new
+                      </span>
+                    )}
+                  </Link>
+
+                  {/* Profile Settings (Mobile) */}
                   <Link
                     href="/profile"
                     onClick={() => setIsOpen(false)}
@@ -295,6 +386,8 @@ const Header = () => {
                   >
                     Profile Settings
                   </Link>
+
+                  {/* Log Out (Mobile) */}
                   <button
                     type="button"
                     onClick={handleLogout}
