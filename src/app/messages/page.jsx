@@ -14,6 +14,10 @@ import {
   setActiveConversation,
 } from "../../features/conversations/conversationSlice";
 
+// Required stylesheets for UIW Markdown Editor & Previewer
+import "@uiw/react-md-editor/markdown-editor.css";
+import "@uiw/react-markdown-preview/markdown.css";
+
 // Dynamically import MDEditor components with SSR disabled to prevent hydration mismatch
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 const MarkdownViewer = dynamic(
@@ -29,17 +33,28 @@ export default function MessagesPage() {
   const currentUserId = currentUser?._id || currentUser?.id;
 
   const {
-    conversations,
-    activeConversation,
-    messages,
-    isLoadingConversations,
-    isLoadingMessages,
-    isSendingMessage,
-  } = useSelector((state) => state.conversations);
+    conversations = [],
+    activeConversation = null,
+    messages = [],
+    isLoadingConversations = false,
+    isLoadingMessages = false,
+    isSendingMessage = false,
+  } = useSelector(
+    (state) =>
+      state.conversations || {
+        conversations: [],
+        activeConversation: null,
+        messages: [],
+        isLoadingConversations: false,
+        isLoadingMessages: false,
+        isSendingMessage: false,
+      }
+  );
 
   const [inboxSearch, setInboxSearch] = useState("");
   const [content, setContent] = useState("");
-  const [editorTab, setEditorTab] = useState("write"); // 'write' | 'preview'
+  // 'edit' or 'preview' (UIW expects 'edit' rather than 'write')
+  const [editorTab, setEditorTab] = useState("edit");
 
   // 1. Initial fetch of conversations on mount
   useEffect(() => {
@@ -66,7 +81,7 @@ export default function MessagesPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Filter conversations by friend username/name
+  // Filter conversations by friend username or name
   const filteredConversations = useMemo(() => {
     const list = Array.isArray(conversations) ? conversations : [];
     if (!inboxSearch.trim()) return list;
@@ -84,6 +99,7 @@ export default function MessagesPage() {
   const handleSelectConversation = (conv) => {
     dispatch(setActiveConversation(conv));
     setContent("");
+    setEditorTab("edit");
   };
 
   const handleSendMessage = async () => {
@@ -145,7 +161,11 @@ export default function MessagesPage() {
                   strokeWidth="2"
                   stroke="currentColor"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
                 </svg>
               </div>
             </div>
@@ -160,7 +180,9 @@ export default function MessagesPage() {
                 </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="p-8 text-center text-xs text-tan/70">
-                  {inboxSearch ? "No chats match your search." : "No active conversations yet."}
+                  {inboxSearch
+                    ? "No chats match your search."
+                    : "No active conversations yet."}
                 </div>
               ) : (
                 filteredConversations.map((conv) => {
@@ -206,7 +228,7 @@ export default function MessagesPage() {
                         </div>
                         <p className="mt-0.5 truncate text-[11px] text-tan/70">
                           {conv.lastMessage?.content
-                            ? conv.lastMessage.content.replace(/[#*`_~]/g, "")
+                            ? conv.lastMessage.content.replace(/[#*`_~>[\]()]/g, "")
                             : "No messages yet"}
                         </p>
                       </div>
@@ -228,7 +250,7 @@ export default function MessagesPage() {
                       {activeFriend?.image ? (
                         <Image
                           src={activeFriend.image}
-                          alt={activeFriend.username}
+                          alt={activeFriend.username || "User"}
                           fill
                           className="object-cover"
                         />
@@ -286,7 +308,7 @@ export default function MessagesPage() {
                           >
                             <MarkdownViewer
                               source={msg.content}
-                              className="!bg-transparent !text-xs"
+                              className="!bg-transparent !text-xs !text-sand"
                             />
                           </div>
                           <span className="mt-1 px-1 font-mono text-[9px] text-tan/60">
@@ -305,7 +327,7 @@ export default function MessagesPage() {
                 {/* Markdown Input Composer */}
                 <div className="border-t border-brown/30 bg-carafe/80 p-4">
                   <div
-                    className="relative rounded-xl border border-brown/40 bg-carafe focus-within:border-tan"
+                    className="relative rounded-xl border border-brown/40 bg-carafe focus-within:border-tan overflow-hidden"
                     data-color-mode="dark"
                     onKeyDown={handleKeyDown}
                   >
@@ -314,8 +336,13 @@ export default function MessagesPage() {
                       onChange={(val) => setContent(val || "")}
                       height={130}
                       preview={editorTab}
+                      hideToolbar={true}
                       visibleDragbar={false}
-                      className="!border-none !bg-transparent"
+                      textareaProps={{
+                        placeholder: "Write a message... (Markdown supported)",
+                        className: "!text-sand !bg-transparent placeholder:text-tan/40 !p-3 !text-xs",
+                      }}
+                      className="!border-none !bg-transparent text-xs"
                     />
 
                     {/* Editor Control Toolbar */}
@@ -323,9 +350,9 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setEditorTab("write")}
-                          className={`rounded px-2 py-1 text-[11px] font-semibold ${
-                            editorTab === "write"
+                          onClick={() => setEditorTab("edit")}
+                          className={`rounded px-2.5 py-1 text-[11px] font-semibold transition ${
+                            editorTab === "edit"
                               ? "bg-brown/40 text-white"
                               : "text-tan/70 hover:text-white"
                           }`}
@@ -335,7 +362,7 @@ export default function MessagesPage() {
                         <button
                           type="button"
                           onClick={() => setEditorTab("preview")}
-                          className={`rounded px-2 py-1 text-[11px] font-semibold ${
+                          className={`rounded px-2.5 py-1 text-[11px] font-semibold transition ${
                             editorTab === "preview"
                               ? "bg-brown/40 text-white"
                               : "text-tan/70 hover:text-white"
@@ -376,7 +403,7 @@ export default function MessagesPage() {
                 </div>
               </>
             ) : (
-              /* No Thread Selected Placeholder */
+              /* Empty Conversation Placeholder */
               <div className="flex h-full flex-col items-center justify-center p-8 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-brown/40 bg-brown/20 text-tan">
                   <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
