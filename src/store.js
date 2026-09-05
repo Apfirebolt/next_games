@@ -6,6 +6,7 @@ import userReducer from './features/user/userSlice'
 import recommendationReducer from './features/recommendations/recommendationSlice'
 import categoryReducer from './features/categories/categorySlice'
 import threadReducer from './features/threads/threadSlice'
+import postReducer from './features/posts/postSlice'
 
 export const makeStore = (preloadedState = {}) => {
   return configureStore({
@@ -17,6 +18,7 @@ export const makeStore = (preloadedState = {}) => {
       recommendations: recommendationReducer,
       categories: categoryReducer,
       threads: threadReducer,
+      posts: postReducer,
     },
     preloadedState,
   });
