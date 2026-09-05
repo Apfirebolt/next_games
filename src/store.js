@@ -8,6 +8,7 @@ import categoryReducer from './features/categories/categorySlice'
 import threadReducer from './features/threads/threadSlice'
 import postReducer from './features/posts/postSlice'
 import friendReducer from './features/friends/friendSlice'
+import conversationReducer from './features/conversations/conversationSlice'
 
 export const makeStore = (preloadedState = {}) => {
   return configureStore({
@@ -21,6 +22,7 @@ export const makeStore = (preloadedState = {}) => {
       threads: threadReducer,
       posts: postReducer,
       friends: friendReducer,
+      conversations: conversationReducer,
     },
     preloadedState,
   });

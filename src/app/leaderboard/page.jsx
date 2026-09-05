@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useSelector, useDispatch } from "react-redux";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
+import Pagination from "../../components/Pagination";
 import { fetchAllUsers } from "../../features/user/userSlice";
 import {
   fetchFriends,
@@ -14,6 +15,8 @@ import {
   sendFriendRequest,
   respondToFriendRequest,
 } from "../../features/friends/friendSlice";
+
+const USERS_PER_PAGE = 10;
 
 // Inline table action button reflecting friendship state
 function TableFriendAction({ targetUserId, isSelf, currentUserId }) {
@@ -135,6 +138,7 @@ export default function LeaderboardPage() {
   );
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch users roster & current user's relationships
   useEffect(() => {
@@ -146,6 +150,12 @@ export default function LeaderboardPage() {
       dispatch(fetchOutgoingRequests());
     }
   }, [dispatch, currentUserId]);
+
+  // Reset to page 1 whenever the search input changes
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
 
   // Memoized search filtering
   const filteredUsers = useMemo(() => {
@@ -161,22 +171,36 @@ export default function LeaderboardPage() {
     });
   }, [users, searchQuery]);
 
-  const getRankBadge = (index) => {
-    if (index === 0) {
+  // Paginate 10 users per page
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE) || 1;
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(startIndex, startIndex + USERS_PER_PAGE);
+  }, [filteredUsers, currentPage]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Global rank index preserved across pages
+  const getRankBadge = (globalRank) => {
+    if (globalRank === 0) {
       return (
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/20 text-xs font-bold text-amber-300">
           🥇 1
         </span>
       );
     }
-    if (index === 1) {
+    if (globalRank === 1) {
       return (
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-300/40 bg-slate-300/20 text-xs font-bold text-slate-200">
           🥈 2
         </span>
       );
     }
-    if (index === 2) {
+    if (globalRank === 2) {
       return (
         <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-amber-700/40 bg-amber-700/20 text-xs font-bold text-amber-600">
           🥉 3
@@ -185,7 +209,7 @@ export default function LeaderboardPage() {
     }
     return (
       <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brown/30 bg-brown/10 text-xs font-semibold text-tan">
-        #{index + 1}
+        #{globalRank + 1}
       </span>
     );
   };
@@ -242,7 +266,7 @@ export default function LeaderboardPage() {
                 type="text"
                 placeholder="Search players by name, username or email..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchChange}
                 className="w-full rounded-lg border border-brown/40 bg-carafe/80 py-2 pl-9 pr-3 text-xs text-sand placeholder-tan/40 transition-colors focus:border-tan focus:outline-none focus:ring-1 focus:ring-tan"
               />
               <svg
@@ -280,7 +304,10 @@ export default function LeaderboardPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
                 className="mt-3 rounded-lg bg-brown px-4 py-2 text-xs font-semibold text-sand hover:bg-brown/80"
               >
                 Clear Search
@@ -309,8 +336,10 @@ export default function LeaderboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brown/20">
-                  {filteredUsers.map((userItem, index) => {
+                  {paginatedUsers.map((userItem, index) => {
                     const targetUserId = userItem._id || userItem.id;
+                    const globalRank = (currentPage - 1) * USERS_PER_PAGE + index;
+
                     const isSelf =
                       currentUser &&
                       (currentUserId?.toString() === targetUserId?.toString() ||
@@ -331,14 +360,14 @@ export default function LeaderboardPage() {
 
                     return (
                       <tr
-                        key={targetUserId || index}
+                        key={targetUserId || globalRank}
                         className={`transition-colors hover:bg-brown/20 ${
                           isSelf ? "bg-brown/25" : ""
                         }`}
                       >
                         {/* Rank */}
                         <td className="whitespace-nowrap px-6 py-4 font-semibold">
-                          {getRankBadge(index)}
+                          {getRankBadge(globalRank)}
                         </td>
 
                         {/* Player Profile */}
@@ -427,6 +456,17 @@ export default function LeaderboardPage() {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {!isLoading && filteredUsers.length > USERS_PER_PAGE && (
+          <div className="mt-8 flex justify-center">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
       </main>
 
       <Footer />

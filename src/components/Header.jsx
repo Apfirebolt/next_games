@@ -9,6 +9,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useSession, signOut } from "next-auth/react";
 import { logout, reset } from "../features/auth/authSlice";
 import { fetchIncomingRequests } from "../features/friends/friendSlice";
+import { fetchConversations } from "../features/conversations/conversationSlice";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,22 +26,26 @@ const Header = () => {
   const incomingRequests = useSelector(
     (state) => state.friends?.incomingRequests || []
   );
+  const conversations = useSelector(
+    (state) => state.conversations?.conversations || []
+  );
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch incoming requests when authenticated to display the badge
   const user = reduxUser || session?.user;
   const currentUserId = user?._id || user?.id;
 
+  // Fetch friend requests and conversations for badges
   useEffect(() => {
     if (currentUserId) {
       dispatch(fetchIncomingRequests());
+      dispatch(fetchConversations());
     }
   }, [dispatch, currentUserId]);
 
-  // Click outside to close the desktop user dropdown
+  // Click outside to close desktop dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -67,13 +72,11 @@ const Header = () => {
   ];
 
   const handleLogout = async () => {
-    // 1. Clear Redux and custom cookies
     dispatch(logout());
     dispatch(reset());
     setIsUserMenuOpen(false);
     setIsOpen(false);
 
-    // 2. Terminate NextAuth session cookie if logged in via Google
     await signOut({ redirect: false });
 
     toast.info("Logged out successfully");
@@ -89,6 +92,13 @@ const Header = () => {
     "Player";
   const userAvatar = user?.image || null;
   const pendingRequestsCount = incomingRequests.length;
+
+  // Calculate total unread messages across all active conversations
+  const unreadMessagesCount = conversations.reduce(
+    (acc, conv) => acc + (conv.unreadCount || 0),
+    0
+  );
+  const totalNotifications = pendingRequestsCount + unreadMessagesCount;
 
   return (
     <header className="sticky top-0 z-50 border-b border-brown/30 bg-carafe/95 backdrop-blur-md transition-all">
@@ -142,8 +152,8 @@ const Header = () => {
                   )}
                   <span className="max-w-[110px] truncate">{displayName}</span>
 
-                  {/* Red dot badge if requests are waiting */}
-                  {pendingRequestsCount > 0 && (
+                  {/* Indicator dot if unread messages or requests exist */}
+                  {totalNotifications > 0 && (
                     <span className="h-2 w-2 rounded-full bg-amber-400" />
                   )}
 
@@ -198,7 +208,7 @@ const Header = () => {
                       </span>
                     </Link>
 
-                    {/* Friends (directly below Saved Vault) */}
+                    {/* Friends */}
                     <Link
                       href="/friends"
                       onClick={() => setIsUserMenuOpen(false)}
@@ -221,6 +231,33 @@ const Header = () => {
                       {pendingRequestsCount > 0 && (
                         <span className="rounded-full bg-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold text-amber-300">
                           {pendingRequestsCount}
+                        </span>
+                      )}
+                    </Link>
+
+                    {/* Messages */}
+                    <Link
+                      href="/messages"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-sand transition-colors hover:bg-brown/20 hover:text-white"
+                    >
+                      <svg
+                        className="h-4 w-4 text-tan"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
+                        />
+                      </svg>
+                      <span className="flex-1 text-left">Messages</span>
+                      {unreadMessagesCount > 0 && (
+                        <span className="rounded-full bg-amber-400 px-1.5 py-0.2 text-[10px] font-extrabold text-carafe">
+                          {unreadMessagesCount}
                         </span>
                       )}
                     </Link>
@@ -374,6 +411,20 @@ const Header = () => {
                     {pendingRequestsCount > 0 && (
                       <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
                         {pendingRequestsCount} new
+                      </span>
+                    )}
+                  </Link>
+
+                  {/* Messages (Mobile) */}
+                  <Link
+                    href="/messages"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-sand hover:bg-brown/20"
+                  >
+                    <span>Messages</span>
+                    {unreadMessagesCount > 0 && (
+                      <span className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-extrabold text-carafe">
+                        {unreadMessagesCount} new
                       </span>
                     )}
                   </Link>
