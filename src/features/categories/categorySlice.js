@@ -1,9 +1,7 @@
-// src/features/categories/categorySlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import categoryService from "./categoryService";
 import { toast } from "react-toastify";
 
-// Helper to extract human-readable error messages
 const extractErrorMessage = (error) => {
   return (
     error.response?.data?.detail ||
@@ -13,11 +11,16 @@ const extractErrorMessage = (error) => {
   );
 };
 
+// Sort helper: order ascending, then fallback to creation date
+const sortCategories = (list) => {
+  return [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+};
+
 const initialState = {
   categories: [],
-  selectedCategory: null, // Holds the currently active category filter
+  selectedCategory: null,
   isLoading: false,
-  isCreateLoading: false, // Dedicated loader for category creation modal/forms
+  isMutationLoading: false, // Unified loader for create, update, and delete actions
   isError: false,
   isSuccess: false,
   message: "",
@@ -29,7 +32,11 @@ export const fetchCategories = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const response = await categoryService.getCategories();
-      return response.data; // Extracts the array from { success: true, data: [...] }
+      // Safely handle both { data: [...] } and raw array responses
+      const categoriesArray = Array.isArray(response)
+        ? response
+        : response?.data || [];
+      return sortCategories(categoriesArray);
     } catch (error) {
       const message = extractErrorMessage(error);
       return thunkAPI.rejectWithValue(message);
@@ -37,14 +44,46 @@ export const fetchCategories = createAsyncThunk(
   }
 );
 
-// 2. Create a new category
+// 2. Create a new category (Admin)
 export const createCategory = createAsyncThunk(
   "categories/create",
   async (categoryData, thunkAPI) => {
     try {
       const response = await categoryService.createCategory(categoryData);
-      toast.success(`Category "${categoryData.title}" created successfully!`);
-      return response.data; // Extracts created object from { success: true, data: { ... } }
+      toast.success(response.message || `Category "${categoryData.title}" created successfully!`);
+      return response.data || response;
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// 3. Update an existing category (Admin)
+export const updateCategory = createAsyncThunk(
+  "categories/update",
+  async ({ categoryId, categoryData }, thunkAPI) => {
+    try {
+      const response = await categoryService.updateCategory(categoryId, categoryData);
+      toast.success(response.message || "Category updated successfully!");
+      return response.data || response;
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// 4. Delete a category (Admin)
+export const deleteCategory = createAsyncThunk(
+  "categories/delete",
+  async (categoryId, thunkAPI) => {
+    try {
+      const response = await categoryService.deleteCategory(categoryId);
+      toast.success(response.message || "Category deleted successfully.");
+      return { categoryId };
     } catch (error) {
       const message = extractErrorMessage(error);
       toast.error(message);
@@ -57,18 +96,16 @@ export const categorySlice = createSlice({
   name: "categories",
   initialState,
   reducers: {
-    // Select category for filtering thread lists
     setSelectedCategory: (state, action) => {
       state.selectedCategory = action.payload;
     },
     resetCategoryStatus: (state) => {
       state.isLoading = false;
-      state.isCreateLoading = false;
+      state.isMutationLoading = false;
       state.isError = false;
       state.isSuccess = false;
       state.message = "";
     },
-    // Optional helper to update category stats locally when a thread is added
     incrementCategoryCounters: (state, action) => {
       const { categoryId, lastActivity } = action.payload;
       const category = state.categories.find((cat) => cat._id === categoryId);
@@ -101,15 +138,61 @@ export const categorySlice = createSlice({
 
       // Create Category
       .addCase(createCategory.pending, (state) => {
-        state.isCreateLoading = true;
+        state.isMutationLoading = true;
+        state.isError = false;
       })
       .addCase(createCategory.fulfilled, (state, action) => {
-        state.isCreateLoading = false;
+        state.isMutationLoading = false;
         state.isSuccess = true;
         state.categories.push(action.payload);
+        state.categories = sortCategories(state.categories);
       })
       .addCase(createCategory.rejected, (state, action) => {
-        state.isCreateLoading = false;
+        state.isMutationLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // Update Category
+      .addCase(updateCategory.pending, (state) => {
+        state.isMutationLoading = true;
+        state.isError = false;
+      })
+      .addCase(updateCategory.fulfilled, (state, action) => {
+        state.isMutationLoading = false;
+        state.isSuccess = true;
+        const updated = action.payload;
+        const index = state.categories.findIndex((c) => c._id === updated._id);
+        if (index !== -1) {
+          state.categories[index] = updated;
+          state.categories = sortCategories(state.categories);
+        }
+        if (state.selectedCategory?._id === updated._id) {
+          state.selectedCategory = updated;
+        }
+      })
+      .addCase(updateCategory.rejected, (state, action) => {
+        state.isMutationLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+
+      // Delete Category
+      .addCase(deleteCategory.pending, (state) => {
+        state.isMutationLoading = true;
+        state.isError = false;
+      })
+      .addCase(deleteCategory.fulfilled, (state, action) => {
+        state.isMutationLoading = false;
+        state.isSuccess = true;
+        const { categoryId } = action.payload;
+        state.categories = state.categories.filter((c) => c._id !== categoryId);
+        if (state.selectedCategory?._id === categoryId) {
+          state.selectedCategory = null;
+        }
+      })
+      .addCase(deleteCategory.rejected, (state, action) => {
+        state.isMutationLoading = false;
         state.isError = true;
         state.message = action.payload;
       });
