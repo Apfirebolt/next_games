@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../lib/dbConnect";
 import { Post } from "../../../models/post";
 import { Thread } from "../../../models/thread";
 import { Category } from "../../../models/category";
 import { getAuthenticatedUser } from "../../../lib/auth";
+import { createNotification } from "../../../lib/notifications";
 
 /**
  * @swagger
@@ -29,11 +31,11 @@ import { getAuthenticatedUser } from "../../../lib/auth";
  *       200:
  *         description: List of posts retrieved
  *       400:
- *         description: Thread ID is required
+ *         description: Thread ID is required or invalid
  *       500:
  *         description: Internal server error
  *   post:
- *     summary: Reply to a thread with optional quote, media, and parent hierarchy
+ *     summary: Reply to a thread with optional quote, media, parent hierarchy, and notification generation
  *     tags: [Posts]
  *     security:
  *       - bearerAuth: []
@@ -74,7 +76,7 @@ import { getAuthenticatedUser } from "../../../lib/auth";
  *       201:
  *         description: Post submitted successfully
  *       400:
- *         description: Missing fields
+ *         description: Missing fields or invalid ID format
  *       401:
  *         description: Unauthorized
  *       403:
@@ -94,6 +96,13 @@ export async function GET(request) {
     if (!threadId) {
       return NextResponse.json(
         { detail: "threadId query parameter is required." },
+        { status: 400 }
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(threadId)) {
+      return NextResponse.json(
+        { detail: "Invalid threadId format." },
         { status: 400 }
       );
     }
@@ -125,9 +134,23 @@ export async function POST(request) {
     const body = await request.json();
     const { threadId, content, media, quote, parentId } = body;
 
-    if (!threadId || !content) {
+    if (!threadId || !content || !content.trim()) {
       return NextResponse.json(
         { detail: "Thread ID and content are required." },
+        { status: 400 }
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(threadId)) {
+      return NextResponse.json(
+        { detail: "Invalid threadId format." },
+        { status: 400 }
+      );
+    }
+
+    if (parentId && !mongoose.Types.ObjectId.isValid(parentId)) {
+      return NextResponse.json(
+        { detail: "Invalid parentId format." },
         { status: 400 }
       );
     }
@@ -150,14 +173,14 @@ export async function POST(request) {
     const author = {
       userId: authUser._id,
       username: authUser.username || authUser.name || "User",
-      avatarUrl: authUser.avatarUrl || "",
+      avatarUrl: authUser.avatarUrl || authUser.image || "",
     };
 
-    // 1. Create and save the new post (triggers pre-save path calculation)
+    // 1. Create and save the post
     const newPost = new Post({
       threadId,
       author,
-      content,
+      content: content.trim(),
       media: media || { url: null, publicId: null },
       quote: quote || {
         originalPostId: null,
@@ -169,7 +192,7 @@ export async function POST(request) {
 
     await newPost.save();
 
-    // 2. Atomically update Thread reply counter and latestPost snapshot
+    // 2. Update Thread counters and latestPost preview
     await Thread.findByIdAndUpdate(threadId, {
       $inc: { replyCount: 1 },
       $set: {
@@ -183,7 +206,7 @@ export async function POST(request) {
       },
     });
 
-    // 3. Atomically update Category post counter and lastActivity
+    // 3. Update Category counters and lastActivity metadata
     await Category.findByIdAndUpdate(thread.categoryId, {
       $inc: { postCount: 1 },
       $set: {
@@ -196,6 +219,53 @@ export async function POST(request) {
         },
       },
     });
+
+    // 4. Generate Notifications
+    const currentUserIdStr = authUser._id.toString();
+    const threadCreatorIdStr = thread.creator.userId.toString();
+    let parentAuthorIdStr = null;
+
+    // Snippet preview for notification texts
+    const cleanSnippet = content
+      .replace(/[#*`_~>[\]()]/g, "")
+      .trim()
+      .slice(0, 50);
+    const contentPreview = `"${cleanSnippet}${content.length > 50 ? "..." : ""}"`;
+
+    // Case A: Reply to a parent comment
+    if (parentId) {
+      const parentPost = await Post.findById(parentId).select("author").lean();
+      if (parentPost?.author?.userId) {
+        parentAuthorIdStr = parentPost.author.userId.toString();
+
+        if (parentAuthorIdStr !== currentUserIdStr) {
+          await createNotification({
+            recipient: parentPost.author.userId,
+            sender: authUser._id,
+            type: "comment_reply",
+            threadId: thread._id,
+            postId: newPost._id,
+            message: `@${author.username} replied to your comment: ${contentPreview}`,
+          });
+        }
+      }
+    }
+
+    // Case B: Reply to the thread creator
+    // Suppress if the user replied to their own thread or if the thread creator already got a comment_reply
+    if (
+      threadCreatorIdStr !== currentUserIdStr &&
+      threadCreatorIdStr !== parentAuthorIdStr
+    ) {
+      await createNotification({
+        recipient: thread.creator.userId,
+        sender: authUser._id,
+        type: "thread_reply",
+        threadId: thread._id,
+        postId: newPost._id,
+        message: `@${author.username} replied to your thread "${thread.title}": ${contentPreview}`,
+      });
+    }
 
     return NextResponse.json(
       { success: true, data: newPost },
