@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../../lib/dbConnect";
 import Friendship from "../../../../models/friendship";
+import Notification from "../../../../models/notification";
 import { getAuthenticatedUser } from "../../../../lib/auth";
+import { createNotification } from "../../../../lib/notifications";
 
 /**
  * @swagger
@@ -78,6 +81,14 @@ export async function PATCH(request, { params }) {
     }
 
     const { friendshipId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(friendshipId)) {
+      return NextResponse.json(
+        { detail: "Invalid friendship ID format." },
+        { status: 400 }
+      );
+    }
+
     const { action } = await request.json();
 
     if (!["accept", "reject"].includes(action)) {
@@ -114,6 +125,29 @@ export async function PATCH(request, { params }) {
     friendship.status = action === "accept" ? "accepted" : "rejected";
     await friendship.save();
 
+    if (action === "accept") {
+      // 1. Mark incoming friend request notification as read
+      await Notification.updateMany(
+        { friendshipId: friendship._id, recipient: user._id },
+        { $set: { isRead: true, readAt: new Date() } }
+      );
+
+      // 2. Dispatch accepted notification to the original requester
+      await createNotification({
+        recipient: friendship.requester,
+        sender: user._id,
+        type: "friend_request_accepted",
+        friendshipId: friendship._id,
+        message: `@${user.username} accepted your friend request.`,
+      });
+    } else {
+      // If rejected, remove the pending notification for the recipient
+      await Notification.deleteMany({
+        friendshipId: friendship._id,
+        recipient: user._id,
+      });
+    }
+
     return NextResponse.json(
       {
         message: `Friend request ${friendship.status} successfully.`,
@@ -142,6 +176,14 @@ export async function DELETE(request, { params }) {
     }
 
     const { friendshipId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(friendshipId)) {
+      return NextResponse.json(
+        { detail: "Invalid friendship ID format." },
+        { status: 400 }
+      );
+    }
+
     const friendship = await Friendship.findById(friendshipId);
 
     if (!friendship) {
@@ -163,7 +205,11 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    await Friendship.findByIdAndDelete(friendshipId);
+    // Cascade delete the friendship record and any related notifications
+    await Promise.all([
+      Friendship.findByIdAndDelete(friendshipId),
+      Notification.deleteMany({ friendshipId }),
+    ]);
 
     return NextResponse.json(
       { message: "Friendship or request removed successfully." },

@@ -20,10 +20,16 @@ const notificationSchema = new mongoose.Schema(
         "friend_request_accepted",
         "thread_reply",
         "comment_reply",
+        "conversation_message"
       ],
       required: true,
       index: true,
     },
+    conversationId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Conversation",
+  default: null,
+},
     // Contextual references
     threadId: {
       type: mongoose.Schema.Types.ObjectId,

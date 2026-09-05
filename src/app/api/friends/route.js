@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../lib/dbConnect";
 import Friendship from "../../../models/friendship";
 import User from "../../../models/user";
 import { getAuthenticatedUser } from "../../../lib/auth";
+import { createNotification } from "../../../lib/notifications";
+
+const USER_FIELDS = "firstName lastName username email image";
 
 /**
  * @swagger
@@ -28,7 +32,7 @@ import { getAuthenticatedUser } from "../../../lib/auth";
  *       500:
  *         description: Internal server error
  *   post:
- *     summary: Send a friend request
+ *     summary: Send a friend request and notify recipient
  *     tags: [Friends]
  *     security:
  *       - BearerAuth: []
@@ -45,9 +49,9 @@ import { getAuthenticatedUser } from "../../../lib/auth";
  *                 type: string
  *     responses:
  *       201:
- *         description: Friend request sent successfully
+ *         description: Friend request sent and notification generated
  *       400:
- *         description: Invalid request or friendship already exists
+ *         description: Invalid request, invalid ID, or friendship already exists
  *       401:
  *         description: Unauthorized
  *       404:
@@ -69,14 +73,13 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "accepted";
-    const userFields = "firstName lastName username email image";
 
     if (type === "incoming") {
       const requests = await Friendship.find({
         recipient: user._id,
         status: "pending",
       })
-        .populate("requester", userFields)
+        .populate("requester", USER_FIELDS)
         .sort({ createdAt: -1 })
         .lean();
 
@@ -88,7 +91,7 @@ export async function GET(request) {
         requester: user._id,
         status: "pending",
       })
-        .populate("recipient", userFields)
+        .populate("recipient", USER_FIELDS)
         .sort({ createdAt: -1 })
         .lean();
 
@@ -100,8 +103,8 @@ export async function GET(request) {
       $or: [{ requester: user._id }, { recipient: user._id }],
       status: "accepted",
     })
-      .populate("requester", userFields)
-      .populate("recipient", userFields)
+      .populate("requester", USER_FIELDS)
+      .populate("recipient", USER_FIELDS)
       .lean();
 
     const friends = friendships.map((f) => {
@@ -143,6 +146,13 @@ export async function POST(request) {
       );
     }
 
+    if (!mongoose.Types.ObjectId.isValid(recipientId)) {
+      return NextResponse.json(
+        { detail: "Invalid recipient ID format." },
+        { status: 400 }
+      );
+    }
+
     if (user._id.toString() === recipientId) {
       return NextResponse.json(
         { detail: "You cannot send a friend request to yourself." },
@@ -150,7 +160,7 @@ export async function POST(request) {
       );
     }
 
-    const recipient = await User.findById(recipientId);
+    const recipient = await User.findById(recipientId).select("_id username").lean();
     if (!recipient) {
       return NextResponse.json(
         { detail: "Recipient user not found." },
@@ -173,6 +183,7 @@ export async function POST(request) {
           { status: 400 }
         );
       }
+
       if (existing.status === "pending") {
         const message =
           existing.requester.toString() === user._id.toString()
@@ -181,11 +192,20 @@ export async function POST(request) {
         return NextResponse.json({ detail: message }, { status: 400 });
       }
 
-      // Re-send if previously rejected
+      // Re-send if previously rejected/canceled
       existing.requester = user._id;
       existing.recipient = recipientId;
       existing.status = "pending";
       await existing.save();
+
+      // Dispatch notification for re-sent request
+      await createNotification({
+        recipient: recipientId,
+        sender: user._id,
+        type: "friend_request_sent",
+        friendshipId: existing._id,
+        message: `@${user.username} sent you a friend request.`,
+      });
 
       return NextResponse.json(
         { message: "Friend request sent.", friendshipId: existing._id },
@@ -193,14 +213,27 @@ export async function POST(request) {
       );
     }
 
+    // Create fresh friendship
     const friendship = await Friendship.create({
       requester: user._id,
       recipient: recipientId,
       status: "pending",
     });
 
+    // Dispatch notification
+    await createNotification({
+      recipient: recipientId,
+      sender: user._id,
+      type: "friend_request_sent",
+      friendshipId: friendship._id,
+      message: `@${user.username} sent you a friend request.`,
+    });
+
     return NextResponse.json(
-      { message: "Friend request sent successfully.", friendshipId: friendship._id },
+      {
+        message: "Friend request sent successfully.",
+        friendshipId: friendship._id,
+      },
       { status: 201 }
     );
   } catch (error) {

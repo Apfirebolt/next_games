@@ -1,71 +1,78 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import dbConnect from "../../../../../lib/dbConnect";
 import Conversation from "../../../../../models/conversation";
 import Friendship from "../../../../../models/friendship";
 import Message from "../../../../../models/message";
+import Notification from "../../../../../models/notification";
 import { getAuthenticatedUser } from "../../../../../lib/auth";
+import { createNotification } from "../../../../../lib/notifications";
+
+const USER_FIELDS = "firstName lastName username email image";
 
 /**
  * @swagger
  * /api/conversations/{conversationId}/messages:
- *   get:
- *     summary: Get chronological messages and mark incoming messages as read
- *     tags: [Conversations]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Message history retrieved
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Access forbidden
- *       404:
- *         description: Conversation not found
- *       500:
- *         description: Internal server error
- *   post:
- *     summary: Send a markdown message in this conversation
- *     tags: [Conversations]
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: conversationId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - content
- *             properties:
- *               content:
- *                 type: string
- *                 description: CommonMark / GFM markdown formatted body
- *     responses:
- *       201:
- *         description: Message sent successfully
- *       400:
- *         description: Message content cannot be empty
- *       401:
- *         description: Unauthorized
- *       403:
- *         description: Forbidden or friendship is no longer active
- *       404:
- *         description: Conversation not found
- *       500:
- *         description: Internal server error
+ * get:
+ * summary: Get chronological messages and mark incoming messages as read
+ * tags: [Conversations]
+ * security:
+ * - BearerAuth: []
+ * parameters:
+ * - in: path
+ * name: conversationId
+ * required: true
+ * schema:
+ * type: string
+ * responses:
+ * 200:
+ * description: Message history retrieved
+ * 400:
+ * description: Invalid conversation ID
+ * 401:
+ * description: Unauthorized
+ * 403:
+ * description: Access forbidden
+ * 404:
+ * description: Conversation not found
+ * 500:
+ * description: Internal server error
+ * post:
+ * summary: Send a markdown message in this conversation
+ * tags: [Conversations]
+ * security:
+ * - BearerAuth: []
+ * parameters:
+ * - in: path
+ * name: conversationId
+ * required: true
+ * schema:
+ * type: string
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * required:
+ * - content
+ * properties:
+ * content:
+ * type: string
+ * description: CommonMark / GFM markdown formatted body
+ * responses:
+ * 201:
+ * description: Message sent successfully
+ * 400:
+ * description: Message content cannot be empty or invalid ID
+ * 401:
+ * description: Unauthorized
+ * 403:
+ * description: Forbidden or friendship is no longer active
+ * 404:
+ * description: Conversation not found
+ * 500:
+ * description: Internal server error
  */
 export async function GET(request, { params }) {
   try {
@@ -80,6 +87,13 @@ export async function GET(request, { params }) {
     }
 
     const { conversationId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return NextResponse.json(
+        { detail: "Invalid conversation ID format." },
+        { status: 400 }
+      );
+    }
 
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -102,8 +116,8 @@ export async function GET(request, { params }) {
 
     // Retrieve all messages ordered chronologically
     const messages = await Message.find({ conversation: conversationId })
-      .populate("sender", "firstName lastName username email image")
-      .populate("recipient", "firstName lastName username email image")
+      .populate("sender", USER_FIELDS)
+      .populate("recipient", USER_FIELDS)
       .sort({ createdAt: 1 })
       .lean();
 
@@ -111,6 +125,18 @@ export async function GET(request, { params }) {
     await Message.updateMany(
       {
         conversation: conversationId,
+        recipient: user._id,
+        isRead: false,
+      },
+      {
+        $set: { isRead: true, readAt: new Date() },
+      }
+    );
+
+    // Also mark any conversation notifications for this thread as read
+    await Notification.updateMany(
+      {
+        conversationId,
         recipient: user._id,
         isRead: false,
       },
@@ -141,6 +167,14 @@ export async function POST(request, { params }) {
     }
 
     const { conversationId } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return NextResponse.json(
+        { detail: "Invalid conversation ID format." },
+        { status: 400 }
+      );
+    }
+
     const { content } = await request.json();
 
     if (!content || !content.trim()) {
@@ -169,7 +203,7 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Identify other participant
+    // Identify recipient
     const recipientId = conversation.participants.find(
       (p) => p.toString() !== user._id.toString()
     );
@@ -187,6 +221,9 @@ export async function POST(request, { params }) {
       );
     }
 
+    // Determine if this is the first message initiating the conversation
+    const isFirstMessage = !conversation.lastMessage;
+
     // Create the markdown message
     const message = await Message.create({
       conversation: conversation._id,
@@ -201,9 +238,28 @@ export async function POST(request, { params }) {
     conversation.lastMessageAt = new Date();
     await conversation.save();
 
+    // Strip markdown symbols for clean notification text
+    const cleanSnippet = content
+      .replace(/[#*`_~>[\]()]/g, "")
+      .trim()
+      .slice(0, 60);
+
+    const notificationMessage = isFirstMessage
+      ? `@${user.username} started a conversation: "${cleanSnippet}${content.length > 60 ? "..." : ""}"`
+      : `@${user.username} sent you a message: "${cleanSnippet}${content.length > 60 ? "..." : ""}"`;
+
+    // Dispatch notification
+    await createNotification({
+      recipient: recipientId,
+      sender: user._id,
+      type: "conversation_message",
+      conversationId: conversation._id,
+      message: notificationMessage,
+    });
+
     const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "firstName lastName username email image")
-      .populate("recipient", "firstName lastName username email image")
+      .populate("sender", USER_FIELDS)
+      .populate("recipient", USER_FIELDS)
       .lean();
 
     return NextResponse.json(
