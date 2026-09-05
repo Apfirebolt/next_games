@@ -15,8 +15,9 @@ const extractErrorMessage = (error) => {
 
 const initialState = {
   favorites: [],
-  favoriteIds: [], // Handy array of numbers to quickly check `favoriteIds.includes(gameId)`
+  favoriteIds: [], // Array of numbers: [gameId, ...]
   isLoading: false,
+  isReviewLoading: false, // Dedicated loader for review mutations
   isError: false,
   isSuccess: false,
   message: "",
@@ -67,12 +68,45 @@ export const removeFavorite = createAsyncThunk(
   }
 );
 
+// 4. Save or update a review
+export const saveGameReview = createAsyncThunk(
+  "favorites/saveReview",
+  async ({ gameId, reviewData }, thunkAPI) => {
+    try {
+      const data = await favoriteService.saveReview(gameId, reviewData);
+      toast.success("Review saved successfully!");
+      return { gameId: Number(gameId), review: data.review };
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// 5. Delete review only
+export const removeGameReview = createAsyncThunk(
+  "favorites/removeReview",
+  async (gameId, thunkAPI) => {
+    try {
+      await favoriteService.removeReview(gameId);
+      toast.info("Review removed");
+      return { gameId: Number(gameId) };
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      toast.error(message);
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
 export const favoriteSlice = createSlice({
   name: "favorites",
   initialState,
   reducers: {
     resetFavorites: (state) => {
       state.isLoading = false;
+      state.isReviewLoading = false;
       state.isError = false;
       state.isSuccess = false;
       state.message = "";
@@ -81,6 +115,7 @@ export const favoriteSlice = createSlice({
       state.favorites = [];
       state.favoriteIds = [];
       state.isLoading = false;
+      state.isReviewLoading = false;
       state.isError = false;
       state.isSuccess = false;
       state.message = "";
@@ -120,6 +155,40 @@ export const favoriteSlice = createSlice({
         state.favoriteIds = state.favoriteIds.filter(
           (id) => id !== removedGameId
         );
+      })
+
+      // Save / Update Review
+      .addCase(saveGameReview.pending, (state) => {
+        state.isReviewLoading = true;
+      })
+      .addCase(saveGameReview.fulfilled, (state, action) => {
+        state.isReviewLoading = false;
+        const { gameId, review } = action.payload;
+        const index = state.favorites.findIndex((fav) => fav.gameId === gameId);
+        if (index !== -1) {
+          state.favorites[index].review = review;
+        }
+      })
+      .addCase(saveGameReview.rejected, (state, action) => {
+        state.isReviewLoading = false;
+        state.message = action.payload;
+      })
+
+      // Remove Review
+      .addCase(removeGameReview.pending, (state) => {
+        state.isReviewLoading = true;
+      })
+      .addCase(removeGameReview.fulfilled, (state, action) => {
+        state.isReviewLoading = false;
+        const { gameId } = action.payload;
+        const index = state.favorites.findIndex((fav) => fav.gameId === gameId);
+        if (index !== -1) {
+          state.favorites[index].review = null;
+        }
+      })
+      .addCase(removeGameReview.rejected, (state, action) => {
+        state.isReviewLoading = false;
+        state.message = action.payload;
       });
   },
 });

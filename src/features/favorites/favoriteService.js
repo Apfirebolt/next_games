@@ -1,3 +1,4 @@
+// src/features/favorites/favoriteService.js
 import httpClient from "../../plugins/interceptor";
 
 const API_URL = "favorites";
@@ -20,10 +21,22 @@ const removeFavorite = async (gameId) => {
   return response.data;
 };
 
-// Check if a specific game is favorited
+// Check if a specific game is favorited and fetch review if present
 const checkFavoriteStatus = async (gameId) => {
   const response = await httpClient.get(`${API_URL}/${gameId}`);
-  return response.data; // { isFavorited: boolean }
+  return response.data;
+};
+
+// Add or update a review for a favorited game
+const saveReview = async (gameId, reviewData) => {
+  const response = await httpClient.put(`${API_URL}/${gameId}`, reviewData);
+  return response.data;
+};
+
+// Remove only the review from a favorited game (retains favorite status)
+const removeReview = async (gameId) => {
+  const response = await httpClient.patch(`${API_URL}/${gameId}`);
+  return response.data;
 };
 
 const favoriteService = {
@@ -31,6 +44,8 @@ const favoriteService = {
   addFavorite,
   removeFavorite,
   checkFavoriteStatus,
+  saveReview,
+  removeReview,
 };
 
 export default favoriteService;
